@@ -59,7 +59,11 @@ typedef enum coolmic_simple_event {
   */
  COOLMIC_SIMPLE_EVENT_THREAD_STOP       =  4,
  /* as COOLMIC_SIMPLE_EVENT_THREAD_STOP but ran inside the thread. */
- COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP   =  5
+ COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP   =  5,
+ /* a VU-Meter result is ready for use.
+  * arg0 is the result (coolmic_vumeter_result_t*).
+  */
+ COOLMIC_SIMPLE_EVENT_VUMETER_RESULT    =  6
 } coolmic_simple_event_t;
 
 /* Generic callback for events.
