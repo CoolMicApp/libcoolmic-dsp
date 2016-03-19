@@ -87,7 +87,7 @@ int                 coolmic_vumeter_unref(coolmic_vumeter_t *self);
 /* Reset the VU-Meter state. This discards all the allready collected data */
 int                 coolmic_vumeter_reset(coolmic_vumeter_t *self);
 
-/* This is to attach the IO Handle of the PCM data stream that is to be passed to the encoder */
+/* This is to attach the IO Handle of the PCM data stream that is to be passed to the analyzer */
 int                 coolmic_vumeter_attach_iohandle(coolmic_vumeter_t *self, coolmic_iohandle_t *handle);
 
 /* Read data from the IO Handle.
