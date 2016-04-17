@@ -23,6 +23,7 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <coolmic-dsp/vumeter.h>
@@ -43,6 +44,9 @@ struct coolmic_vumeter {
     char buffer[2*COOLMIC_DSP_VUMETER_MAX_CHANNELS*32];
     /* how much data we have in the buffer in [Byte] */
     size_t buffer_fill;
+
+    /* Storage for per channel power values */
+    int64_t power[COOLMIC_DSP_VUMETER_MAX_CHANNELS];
 
     /* result */
     coolmic_vumeter_result_t result;
@@ -95,6 +99,7 @@ int                 coolmic_vumeter_reset(coolmic_vumeter_t *self)
     if (!self)
         return -1;
 
+    memset(&(self->power), 0, sizeof(self->power));
     memset(&(self->result), 0, sizeof(self->result));
     self->result.rate = self->rate;
     self->result.channels = self->channels;
@@ -163,6 +168,8 @@ ssize_t             coolmic_vumeter_read(coolmic_vumeter_t *self, ssize_t maxlen
                 }
             }
 
+            self->power[c] += ((int64_t)*in) * ((int64_t)*in);
+
             /* go to next value */
             in++;
         }
@@ -182,8 +189,25 @@ ssize_t             coolmic_vumeter_read(coolmic_vumeter_t *self, ssize_t maxlen
 
 int                 coolmic_vumeter_result(coolmic_vumeter_t *self, coolmic_vumeter_result_t *result)
 {
+    unsigned int c;
+    int64_t p_all = 0;
+    double p;
+
     if (!self || !result)
         return -1;
+
+    for (c = 0; c < self->channels; c++) {
+        p_all += self->power[c];
+        p = (double)(self->power[c] / (int64_t)self->result.frames);
+        p = 20.*log10(sqrt(p) / 32768.);
+        p = fmin(p, 0.);
+        self->result.channel_power[c] = p;
+    }
+
+    p = (double)(p_all / (uint64_t)(self->result.frames * (size_t)self->channels));
+    p = 20.*log10(sqrt(p) / 32768.);
+    p = fmin(p, 0.);
+    self->result.global_power = p;
 
     memcpy(result, &(self->result), sizeof(self->result));
     coolmic_vumeter_reset(self);
