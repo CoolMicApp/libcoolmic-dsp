@@ -173,6 +173,8 @@ ssize_t             coolmic_vumeter_read(coolmic_vumeter_t *self, ssize_t maxlen
     if ((frames * framesize) < self->buffer_fill) {
         memmove(self->buffer, self->buffer + (frames * framesize), self->buffer_fill - (frames * framesize));
         self->buffer_fill -= frames * framesize;
+    } else {
+        self->buffer_fill = 0;
     }
 
     return ret;
