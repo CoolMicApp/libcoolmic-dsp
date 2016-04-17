@@ -39,6 +39,11 @@ struct coolmic_vumeter {
     /* number of channels */
     unsigned int channels;
 
+    /* buffer for calculation */
+    char buffer[2*COOLMIC_DSP_VUMETER_MAX_CHANNELS*32];
+    /* how much data we have in the buffer in [Byte] */
+    size_t buffer_fill;
+
     /* result */
     coolmic_vumeter_result_t result;
 };
@@ -108,11 +113,69 @@ int                 coolmic_vumeter_attach_iohandle(coolmic_vumeter_t *self, coo
     return 0;
 }
 
+static ssize_t      coolmic_vumeter_read_phy(coolmic_vumeter_t *self, ssize_t maxlen)
+{
+    size_t len;
+    ssize_t ret;
+
+    len = sizeof(self->buffer) - self->buffer_fill;
+
+    if (maxlen >= 0 && len > (size_t)maxlen)
+        len = maxlen;
+
+    ret = coolmic_iohandle_read(self->in, self->buffer + self->buffer_fill, len);
+
+    if (ret == -1 && !self->buffer_fill) {
+        return -1;
+    } else if (ret == -1) {
+        return 0;
+    }
+
+    self->buffer_fill += ret;
+
+    return ret;
+}
+
 ssize_t             coolmic_vumeter_read(coolmic_vumeter_t *self, ssize_t maxlen)
 {
+    ssize_t ret;
+    size_t framesize;
+    size_t frames;
+    size_t f, c;
+    int16_t *in;
+
     if (!self)
         return -1;
-    return -1; /* TODO: implement this */
+
+    ret = coolmic_vumeter_read_phy(self, maxlen);
+
+    in = (int16_t*)(self->buffer);
+
+    framesize = self->channels * 2;
+    frames = self->buffer_fill / framesize;
+
+    for (f = 0; f < frames; f++) {
+        for (c = 0; c < self->channels; c++) {
+            if (abs(*in) > abs(self->result.channel_peak[c])) {
+                self->result.channel_peak[c] = *in;
+                if (abs(*in) > abs(self->result.global_peak)) {
+                    self->result.global_peak = *in;
+                }
+            }
+
+            /* go to next value */
+            in++;
+        }
+    }
+
+    self->result.frames += frames;
+
+    if ((frames * framesize) < self->buffer_fill) {
+        memmove(self->buffer, self->buffer + (frames * framesize), self->buffer_fill - (frames * framesize));
+        self->buffer_fill -= frames * framesize;
+    }
+
+    return ret;
 }
 
 int                 coolmic_vumeter_result(coolmic_vumeter_t *self, coolmic_vumeter_result_t *result)
