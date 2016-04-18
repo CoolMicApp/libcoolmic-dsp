@@ -24,6 +24,7 @@
 /* Please see the corresponding header file for details of this API. */
 
 #include <stdlib.h>
+#include <string.h>
 #include <coolmic-dsp/tee.h>
 
 #define MAX_READERS 4
@@ -68,7 +69,107 @@ struct coolmic_tee {
     backpointer_t backpointer[MAX_READERS];
 };
 
-static ssize_t __read(void *userdata, void *buffer, size_t len);
+static void __readjust_buffer(coolmic_tee_t *self, size_t len_request)
+{
+    void *buffer_new;
+    size_t i;
+    size_t min_offset;
+
+    /* request a new buffer if needed
+     * We limit this to range of 1024 to 8192 to avoid both short buffers (performance)
+     * as well as long buffers (likely invalid reads).
+     */
+    if (len_request < 1024) {
+        len_request = 1024;
+    } else if (len_request > 8192) {
+        len_request = 8192;
+    }
+
+    if (len_request > self->buffer_len) {
+        buffer_new = realloc(self->buffer, len_request);
+        if (buffer_new) {
+            self->buffer = buffer_new;
+            self->buffer_len = len_request;
+        }
+    }
+
+    if (!self->buffer)
+        return;
+
+    /* look up the common (minimum) offset of all reads into the buffer */
+    min_offset = self->buffer_fill;
+    for (i = 0; i < self->readers; i++)
+        if (self->offset[i] < min_offset)
+            min_offset = self->offset[i];
+
+    /* if we got a minimum offset > 0 we can move what we have to the begin of the buffer */
+    if (min_offset > 0) {
+        memmove(self->buffer, self->buffer + min_offset, self->buffer_fill - min_offset);
+        self->buffer_fill -= min_offset;
+
+        for (i = 0; i < self->readers; i++)
+            self->offset[i] -= min_offset;
+    }
+}
+
+static ssize_t __read_phy(coolmic_tee_t *self, size_t len_request)
+{
+    size_t iter;
+    size_t ret;
+
+    __readjust_buffer(self, len_request);
+
+    iter = self->buffer_len - self->buffer_fill;
+
+    /* check if there is some kind of problem with the buffer */
+    if (!self->buffer || !iter)
+        return -1;
+
+    if (iter > len_request)
+        iter = len_request;
+
+    ret = coolmic_iohandle_read(self->in, self->buffer + self->buffer_fill, iter);
+    if (ret < 1)
+        return ret;
+
+    self->buffer_fill += ret;
+
+    return ret;
+}
+
+static ssize_t __read(void *userdata, void *buffer, size_t len)
+{
+    backpointer_t *backpointer = userdata;
+    coolmic_tee_t *self = backpointer->parent;
+    ssize_t ret = 0;
+    size_t iter;
+
+    do {
+        iter = self->buffer_fill - self->offset[backpointer->index];
+        if (!iter) {
+            if (__read_phy(self, len) < 1)
+                return ret;
+            iter = self->buffer_fill - self->offset[backpointer->index];
+        }
+
+        if (iter > len)
+            iter = len;
+
+        memcpy(buffer, self->buffer + self->offset[backpointer->index], iter);
+
+        ret += iter;
+
+        if (iter == len)
+            return ret;
+
+        buffer += iter;
+        len -= iter;
+        self->offset[backpointer->index] += iter;
+    } while (iter);
+
+    return ret;
+}
+
 static int __eof(void *userdata)
 {
     backpointer_t *backpointer = userdata;
