@@ -49,6 +49,9 @@ struct coolmic_tee {
     /* IO buffer length */
     size_t buffer_len;
 
+    /* IO buffer fill */
+    size_t buffer_fill;
+
     /* IO buffer */
     void *buffer;
 
@@ -66,7 +69,15 @@ struct coolmic_tee {
 };
 
 static ssize_t __read(void *userdata, void *buffer, size_t len);
-static int __eof(void *userdata);
+static int __eof(void *userdata) {
+    backpointer_t *backpointer = userdata;
+    coolmic_tee_t *self = backpointer->parent;
+
+    if (self->offset[backpointer->index] < self->buffer_fill)
+        return 0;
+
+    return coolmic_iohandle_eof(self->in);
+}
 
 /* Management of the tee object */
 coolmic_tee_t      *coolmic_tee_new(size_t readers)
