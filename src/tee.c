@@ -69,7 +69,8 @@ struct coolmic_tee {
 };
 
 static ssize_t __read(void *userdata, void *buffer, size_t len);
-static int __eof(void *userdata) {
+static int __eof(void *userdata)
+{
     backpointer_t *backpointer = userdata;
     coolmic_tee_t *self = backpointer->parent;
 
