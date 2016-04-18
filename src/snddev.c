@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <strings.h>
-#include <libcoolmic-dsp/snddev.h>
+#include <coolmic-dsp/snddev.h>
 
 /* default driver */
 #ifndef DEFAULT_SNDDRV_DRIVER

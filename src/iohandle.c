@@ -24,7 +24,7 @@
 /* Please see the corresponding header file for details of this API. */
 
 #include <stdlib.h>
-#include <libcoolmic-dsp/iohandle.h>
+#include <coolmic-dsp/iohandle.h>
 
 struct coolmic_iohandle {
     size_t   refc;

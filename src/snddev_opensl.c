@@ -30,7 +30,7 @@
 #include <pthread.h>
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
-#include <libcoolmic-dsp/snddev.h>
+#include <coolmic-dsp/snddev.h>
 
 #define BUFFERFRAMES 1024
 

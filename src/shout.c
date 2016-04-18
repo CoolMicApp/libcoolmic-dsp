@@ -25,7 +25,7 @@
 
 #include <stdlib.h>
 #include <shout/shout.h>
-#include <libcoolmic-dsp/shout.h>
+#include <coolmic-dsp/shout.h>
 
 struct coolmic_shout {
     size_t refc;

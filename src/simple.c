@@ -26,11 +26,11 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <libcoolmic-dsp/simple.h>
-#include <libcoolmic-dsp/iohandle.h>
-#include <libcoolmic-dsp/snddev.h>
-#include <libcoolmic-dsp/enc.h>
-#include <libcoolmic-dsp/shout.h>
+#include <coolmic-dsp/simple.h>
+#include <coolmic-dsp/iohandle.h>
+#include <coolmic-dsp/snddev.h>
+#include <coolmic-dsp/enc.h>
+#include <coolmic-dsp/shout.h>
 
 struct coolmic_simple {
     size_t refc;

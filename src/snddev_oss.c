@@ -31,7 +31,7 @@
 #include <fcntl.h>
 #include <sys/soundcard.h>
 #include <sys/ioctl.h>
-#include <libcoolmic-dsp/snddev.h>
+#include <coolmic-dsp/snddev.h>
 
 /* default device */
 #define DEFAULT_DEVICE "/dev/audio"

@@ -27,8 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <libcoolmic-dsp/coolmic-dsp.h>
-#include <libcoolmic-dsp/enc.h>
+#include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/enc.h>
 #include <vorbis/vorbisenc.h>
 
 typedef enum coolmic_enc_state {
