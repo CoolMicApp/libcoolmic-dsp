@@ -158,13 +158,13 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
         memcpy(buffer, self->buffer + self->offset[backpointer->index], iter);
 
         ret += iter;
+        self->offset[backpointer->index] += iter;
 
         if (iter == len)
             return ret;
 
         buffer += iter;
         len -= iter;
-        self->offset[backpointer->index] += iter;
     } while (iter);
 
     return ret;
