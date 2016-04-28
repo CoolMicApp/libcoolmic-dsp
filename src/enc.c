@@ -135,11 +135,12 @@ static int __vorbis_read_data(coolmic_enc_t *self)
     ret = coolmic_iohandle_read(self->in, buffer, sizeof(buffer));
 
     if (ret < 1) {
+        vorbis_analysis_wrote(&(self->vd), 0);
         if (coolmic_iohandle_eof(self->in) == 1) {
-            vorbis_analysis_wrote(&(self->vd), 0);
             self->state = STATE_EOF;
+            return -1;
         }
-        return -1;
+        return 0;
     }
 
     /* Have we got a strange nummber of bytes? */
