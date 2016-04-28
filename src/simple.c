@@ -183,7 +183,7 @@ static void *__worker(void *userdata)
     coolmic_shout_t *shout;
     coolmic_vumeter_t *vumeter;
     size_t vumeter_iter = 1;
-    size_t vumeter_interval = 8;
+    size_t vumeter_interval = 4;
     ssize_t ret;
     coolmic_vumeter_result_t vumeter_result;
 
