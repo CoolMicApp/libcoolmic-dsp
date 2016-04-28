@@ -196,6 +196,9 @@ int                 coolmic_vumeter_result(coolmic_vumeter_t *self, coolmic_vume
     if (!self || !result)
         return -1;
 
+    if (!self->result.frames)
+        return -1;
+
     for (c = 0; c < self->channels; c++) {
         p_all += self->power[c];
         p = (double)(self->power[c] / (int64_t)self->result.frames);
