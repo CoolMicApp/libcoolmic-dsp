@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <coolmic-dsp/tee.h>
+#include <coolmic-dsp/iohandle.h>
+#include <coolmic-dsp/coolmic-dsp.h>
 
 #define MAX_READERS 4
 
@@ -123,7 +125,7 @@ static ssize_t __read_phy(coolmic_tee_t *self, size_t len_request)
 
     /* check if there is some kind of problem with the buffer */
     if (!self->buffer || !iter)
-        return -1;
+        return COOLMIC_ERROR_NOMEM;
 
     if (iter > len_request)
         iter = len_request;
@@ -176,7 +178,7 @@ static int __eof(void *userdata)
     coolmic_tee_t *self = backpointer->parent;
 
     if (self->offset[backpointer->index] < self->buffer_fill)
-        return 0;
+        return 0; /* bool */
 
     return coolmic_iohandle_eof(self->in);
 }
@@ -209,37 +211,37 @@ coolmic_tee_t      *coolmic_tee_new(size_t readers)
 int                 coolmic_tee_ref(coolmic_tee_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc++;
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_tee_unref(coolmic_tee_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc--;
     if (self->refc != 0) /* TODO: update this */
-        return 0;
+        return COOLMIC_ERROR_NONE;
 
     coolmic_iohandle_unref(self->in);
     if (self->buffer)
         free(self->buffer);
     free(self);
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 /* This is to attach the IO Handle the tee module should read from */
 int                 coolmic_tee_attach_iohandle(coolmic_tee_t *self, coolmic_iohandle_t *handle)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     if (self->in)
         coolmic_iohandle_unref(self->in);
     /* ignore errors here as handle is allowed to be NULL */
     coolmic_iohandle_ref(self->in = handle);
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 /* This function is to get the IO Handles users can read from */

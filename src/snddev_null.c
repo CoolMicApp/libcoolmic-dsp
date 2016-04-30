@@ -27,6 +27,7 @@
 
 #include <string.h>
 #include <coolmic-dsp/snddev.h>
+#include <coolmic-dsp/coolmic-dsp.h>
 
 static ssize_t __read(coolmic_snddev_driver_t *dev, void *buffer, size_t len)
 {
@@ -49,5 +50,5 @@ int coolmic_snddev_driver_null_open(coolmic_snddev_driver_t *dev, const char *dr
     dev->read = __read;
     dev->write = __write;
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }

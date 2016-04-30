@@ -31,6 +31,7 @@
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
 #include <coolmic-dsp/snddev.h>
+#include <coolmic-dsp/coolmic-dsp.h>
 
 #define BUFFERFRAMES 1024
 
@@ -271,7 +272,7 @@ static ssize_t __read(coolmic_snddev_driver_t *dev, void *buffer, size_t len)
 
 static ssize_t __write(coolmic_snddev_driver_t *dev, const void *buffer, size_t len)
 {
-    return -1;
+    return COOLMIC_ERROR_NOSYS;
 }
 
 static int __free(coolmic_snddev_driver_t *dev)
@@ -295,7 +296,7 @@ static int __free(coolmic_snddev_driver_t *dev)
 
     free(dev->userdata_vp);
     memset(dev, 0, sizeof(*dev));
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int coolmic_snddev_driver_opensl_open(coolmic_snddev_driver_t *dev, const char *driver, void *device, uint_least32_t rate, unsigned int channels, int flags, ssize_t buffer)
@@ -307,7 +308,7 @@ int coolmic_snddev_driver_opensl_open(coolmic_snddev_driver_t *dev, const char *
 
     self = calloc(1, sizeof(snddev_opensl_t));
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_NOMEM;
 
     dev->free = __free;
     dev->read = __read;
@@ -317,20 +318,20 @@ int coolmic_snddev_driver_opensl_open(coolmic_snddev_driver_t *dev, const char *
     self->recorder_lock = __lock_new();
     if (!self->recorder_lock) {
         __free(dev);
-        return -1;
+        return COOLMIC_ERROR_GENERIC;
     }
 
     if (openSLCreateEngine(self) != SL_RESULT_SUCCESS) {
         __free(dev);
-        return -1;
+        return COOLMIC_ERROR_GENERIC;
     }
 
     if (flags & COOLMIC_DSP_SNDDEV_RX) {
         if (__recorder_open(self, rate, channels, buffer) != SL_RESULT_SUCCESS) {
             __free(dev);
-            return -1;
+            return COOLMIC_ERROR_GENERIC;
         }
     }
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }

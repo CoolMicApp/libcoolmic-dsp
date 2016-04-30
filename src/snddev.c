@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <coolmic-dsp/snddev.h>
+#include <coolmic-dsp/coolmic-dsp.h>
 
 /* default driver */
 #ifndef DEFAULT_SNDDRV_DRIVER
@@ -62,7 +63,7 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
 {
     coolmic_snddev_t *self = (coolmic_snddev_t*)userdata;
     if (!self->driver.read)
-        return -1;
+        return COOLMIC_ERROR_NOSYS;
     return self->driver.read(&(self->driver), buffer, len);
 }
 
@@ -114,19 +115,19 @@ coolmic_snddev_t   *coolmic_snddev_new(const char *driver, void *device, uint_le
 int                 coolmic_snddev_ref(coolmic_snddev_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc++;
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_snddev_unref(coolmic_snddev_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc--;
 
     if (self->refc != 1) /* 1=reference in self->rx */
-        return 0;
+        return COOLMIC_ERROR_NONE;
 
     coolmic_iohandle_unref(self->rx);
     coolmic_iohandle_unref(self->tx);
@@ -136,18 +137,18 @@ int                 coolmic_snddev_unref(coolmic_snddev_t *self)
 
     free(self);
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_snddev_attach_iohandle(coolmic_snddev_t *self, coolmic_iohandle_t *handle)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     if (self->tx)
         coolmic_iohandle_unref(self->tx);
     /* ignore errors here as handle is allowed to be NULL */
     coolmic_iohandle_ref(self->tx = handle);
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 coolmic_iohandle_t *coolmic_snddev_get_iohandle(coolmic_snddev_t *self)
@@ -162,5 +163,5 @@ int                 coolmic_snddev_iter(coolmic_snddev_t *self)
 {
     /* TODO */
     (void)self;
-    return -1;
+    return COOLMIC_ERROR_NOSYS;
 }

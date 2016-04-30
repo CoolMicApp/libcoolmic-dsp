@@ -217,11 +217,11 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
     size_t max_len;
 
     if (self->offset_in_page == -1)
-        return -1;
+        return COOLMIC_ERROR_GENERIC;
 
     if (self->offset_in_page == (self->og.header_len + self->og.body_len))
         if (__need_new_page(self) == -1)
-            return -1;
+            return COOLMIC_ERROR_GENERIC;
 
     if (self->offset_in_page < self->og.header_len) {
         max_len = self->og.header_len - self->offset_in_page;
@@ -244,9 +244,9 @@ static int __eof(void *userdata)
     coolmic_enc_t *self = userdata;
 
     if (self->offset_in_page == (self->og.header_len + self->og.body_len) && self->state == STATE_EOF)
-        return 1;
+        return 1; /* bool */
 
-    return 0;
+    return 0; /* bool */
 }
 
 coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsigned int channels)
@@ -280,18 +280,18 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
 int                 coolmic_enc_ref(coolmic_enc_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc++;
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_enc_unref(coolmic_enc_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc--;
     if (self->refc != 1) /* 1 = reference in self->out */
-        return 0;
+        return COOLMIC_ERROR_NONE;
 
     __vorbis_stop_encoder(self);
 
@@ -299,15 +299,15 @@ int                 coolmic_enc_unref(coolmic_enc_t *self)
     coolmic_iohandle_unref(self->out);
     free(self);
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_enc_reset(coolmic_enc_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     if (self->state != STATE_RUNNING && self->state != STATE_EOF)
-        return -1;
+        return COOLMIC_ERROR_GENERIC;
 
     /* send EOF event */
     self->state = STATE_EOF;
@@ -318,18 +318,18 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
             break;
 
     self->state = STATE_NEED_RESET;
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_enc_attach_iohandle(coolmic_enc_t *self, coolmic_iohandle_t *handle)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     if (self->in)
         coolmic_iohandle_unref(self->in);
     /* ignore errors here as handle is allowed to be NULL */
     coolmic_iohandle_ref(self->in = handle);
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 coolmic_iohandle_t *coolmic_enc_get_iohandle(coolmic_enc_t *self)

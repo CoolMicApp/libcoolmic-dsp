@@ -25,6 +25,7 @@
 
 #include <stdlib.h>
 #include <coolmic-dsp/iohandle.h>
+#include <coolmic-dsp/coolmic-dsp.h>
 
 struct coolmic_iohandle {
     size_t   refc;
@@ -58,45 +59,45 @@ coolmic_iohandle_t *coolmic_iohandle_new(void *userdata, int(*free)(void*), ssiz
 int                 coolmic_iohandle_ref(coolmic_iohandle_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc++;
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_iohandle_unref(coolmic_iohandle_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc--;
     if (self->refc)
-        return 0;
+        return COOLMIC_ERROR_NONE;
 
     if (self->free) {
         if (self->free(self->userdata) != 0) {
             self->refc++;
-            return -1;
+            return COOLMIC_ERROR_GENERIC;
         }
     }
 
     free(self);
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 ssize_t             coolmic_iohandle_read(coolmic_iohandle_t *self, void *buffer, size_t len)
 {
     if (!self || !buffer)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     if (!len)
-        return 0;
+        return COOLMIC_ERROR_NONE;
     return self->read(self->userdata, buffer, len);
 }
 
 int                 coolmic_iohandle_eof(coolmic_iohandle_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     if (self->eof)
         return self->eof(self->userdata);
-    return 0;
+    return 0; /* bool */
 }

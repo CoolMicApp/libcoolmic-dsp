@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <coolmic-dsp/vumeter.h>
+#include <coolmic-dsp/coolmic-dsp.h>
 
 struct coolmic_vumeter {
     /* reference counter */
@@ -75,47 +76,47 @@ coolmic_vumeter_t  *coolmic_vumeter_new(uint_least32_t rate, unsigned int channe
 int                 coolmic_vumeter_ref(coolmic_vumeter_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc++;
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_vumeter_unref(coolmic_vumeter_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     self->refc--;
     if (self->refc != 0)
-        return 0;
+        return COOLMIC_ERROR_NONE;
 
     coolmic_iohandle_unref(self->in);
     free(self);
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_vumeter_reset(coolmic_vumeter_t *self)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
 
     memset(&(self->power), 0, sizeof(self->power));
     memset(&(self->result), 0, sizeof(self->result));
     self->result.rate = self->rate;
     self->result.channels = self->channels;
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_vumeter_attach_iohandle(coolmic_vumeter_t *self, coolmic_iohandle_t *handle)
 {
     if (!self)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
     if (self->in)
         coolmic_iohandle_unref(self->in);
     /* ignore errors here as handle is allowed to be NULL */
     coolmic_iohandle_ref(self->in = handle);
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 static ssize_t      coolmic_vumeter_read_phy(coolmic_vumeter_t *self, ssize_t maxlen)
@@ -194,10 +195,10 @@ int                 coolmic_vumeter_result(coolmic_vumeter_t *self, coolmic_vume
     double p;
 
     if (!self || !result)
-        return -1;
+        return COOLMIC_ERROR_FAULT;
 
     if (!self->result.frames)
-        return -1;
+        return COOLMIC_ERROR_INVAL;
 
     for (c = 0; c < self->channels; c++) {
         p_all += self->power[c];
@@ -215,5 +216,5 @@ int                 coolmic_vumeter_result(coolmic_vumeter_t *self, coolmic_vume
     memcpy(result, &(self->result), sizeof(self->result));
     coolmic_vumeter_reset(self);
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }

@@ -32,6 +32,7 @@
 #include <sys/soundcard.h>
 #include <sys/ioctl.h>
 #include <coolmic-dsp/snddev.h>
+#include <coolmic-dsp/coolmic-dsp.h>
 
 /* default device */
 #define DEFAULT_DEVICE "/dev/audio"
@@ -73,7 +74,7 @@ int coolmic_snddev_driver_oss_open(coolmic_snddev_driver_t *dev, const char *dri
             mode = O_RDWR;
         break;
         default:
-            return -1;
+            return COOLMIC_ERROR_INVAL;
         break;
     }
 
@@ -105,10 +106,10 @@ int coolmic_snddev_driver_oss_open(coolmic_snddev_driver_t *dev, const char *dri
         dev->read = __read;
         dev->write = __write;
 
-        return 0;
+        return COOLMIC_ERROR_NONE;
     } while (0);
 
     if (dev->userdata_i != -1)
         __free(dev);
-    return -1;
+    return COOLMIC_ERROR_GENERIC;
 }
