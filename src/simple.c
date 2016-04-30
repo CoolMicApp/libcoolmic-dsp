@@ -90,7 +90,7 @@ static void __stop_unlocked(coolmic_simple_t *self)
     if (!self->running)
         return;
     self->running = 2;
-    __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, &(self->thread), NULL, NULL);
+    __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, NULL, &(self->thread), NULL);
     pthread_mutex_unlock(&(self->lock));
     pthread_join(self->thread, NULL);
     pthread_mutex_lock(&(self->lock));
@@ -277,7 +277,7 @@ int                 coolmic_simple_start(coolmic_simple_t *self)
     if (!self->running)
         if (pthread_create(&(self->thread), NULL, __worker, self) == 0) {
             self->running = 1;
-            __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_START, &(self->thread), NULL, NULL);
+            __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_START, NULL, &(self->thread), NULL);
         }
     running = self->running;
     pthread_mutex_unlock(&(self->lock));
