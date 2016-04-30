@@ -55,11 +55,14 @@ struct coolmic_simple {
 };
 
 /* emit an event */
-static inline void __emit_event(coolmic_simple_t *self, coolmic_simple_event_t event, void *thread, void *arg0, void *arg1)
+static inline void __emit_event(coolmic_simple_t *self, coolmic_simple_event_t event, void *thread, void *arg0, void *arg1, int locked)
 {
     coolmic_simple_callback_t callback;
     void *callback_userdata;
     
+    if (!locked)
+        pthread_mutex_lock(&(self->lock));
+
     if (!self->callback)
         return;
 
@@ -68,34 +71,50 @@ static inline void __emit_event(coolmic_simple_t *self, coolmic_simple_event_t e
     /* the callback is called in unlocked state. */
     pthread_mutex_unlock(&(self->lock));
     callback(self, callback_userdata, event, thread, arg0, arg1);
-    pthread_mutex_lock(&(self->lock));
+
+    if (locked)
+        pthread_mutex_lock(&(self->lock));
 }
 
-static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, int error) {
-    coolmic_simple_callback_t callback;
-    void *callback_userdata;
-
-    pthread_mutex_lock(&(self->lock));
-    if (!self->callback)
-        return;
-
-    callback = self->callback;
-    callback_userdata = self->callback_userdata;
-    pthread_mutex_unlock(&(self->lock));
-    /* the callback is called in unlocked state. */
-    callback(self, callback_userdata, COOLMIC_SIMPLE_EVENT_ERROR, thread, &error, NULL);
+static inline void __emit_event_locked(coolmic_simple_t *self, coolmic_simple_event_t event, void *thread, void *arg0, void *arg1)
+{
+    __emit_event(self, event, thread, arg0, arg1, 1);
 }
 
-static void __stop_unlocked(coolmic_simple_t *self)
+static inline void __emit_event_unlocked(coolmic_simple_t *self, coolmic_simple_event_t event, void *thread, void *arg0, void *arg1)
+{
+    __emit_event(self, event, thread, arg0, arg1, 0);
+}
+
+static inline void __emit_cs_locked(coolmic_simple_t *self, void *thread, coolmic_simple_connectionstate_t cs, int error)
+{
+    __emit_event(self, COOLMIC_SIMPLE_EVENT_STREAMSTATE, thread, &cs, &error, 1);
+}
+
+static inline void __emit_cs_unlocked(coolmic_simple_t *self, void *thread, coolmic_simple_connectionstate_t cs, int error)
+{
+    __emit_event(self, COOLMIC_SIMPLE_EVENT_STREAMSTATE, thread, &cs, &error, 0);
+}
+
+static inline void __emit_error_locked(coolmic_simple_t *self, void *thread, int error)
+{
+    __emit_event(self, COOLMIC_SIMPLE_EVENT_ERROR, thread, &error, NULL, 1);
+}
+static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, int error)
+{
+    __emit_event(self, COOLMIC_SIMPLE_EVENT_ERROR, thread, &error, NULL, 0);
+}
+
+static void __stop_locked(coolmic_simple_t *self)
 {
     if (!self->thread_needs_join && self->running != 1)
         return;
     self->running = 2;
-    __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, NULL, &(self->thread), NULL);
+    __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, NULL, &(self->thread), NULL);
     pthread_mutex_unlock(&(self->lock));
     pthread_join(self->thread, NULL);
-    self->thread_needs_join = 0;
     pthread_mutex_lock(&(self->lock));
+    self->thread_needs_join = 0;
 }
 
 coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, unsigned int channels, ssize_t buffer, const coolmic_shout_config_t *conf)
@@ -171,7 +190,7 @@ int                 coolmic_simple_unref(coolmic_simple_t *self)
         return COOLMIC_ERROR_NONE;
     }
 
-    __stop_unlocked(self);
+    __stop_locked(self);
 
     coolmic_iohandle_unref(self->ogg);
     coolmic_shout_unref(self->shout);
@@ -207,11 +226,11 @@ static void *__worker(void *userdata)
     int error;
 
     pthread_mutex_lock(&(self->lock));
-    __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_POST_START, &(self->thread), NULL, NULL);
+    __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_POST_START, &(self->thread), NULL, NULL);
     if (self->need_reset) {
         if (__reset(self) != 0) {
             self->running = 0;
-            __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
+            __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
             self->thread_needs_join = 1;
             pthread_mutex_unlock(&(self->lock));
             return NULL;
@@ -223,14 +242,19 @@ static void *__worker(void *userdata)
     coolmic_vumeter_ref(vumeter = self->vumeter);
     pthread_mutex_unlock(&(self->lock));
 
+    __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTING, COOLMIC_ERROR_NONE);
     if ((error = coolmic_shout_start(shout)) != COOLMIC_ERROR_NONE) {
         running = 0;
         __emit_error_unlocked(self, &(self->thread), error);
+        __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTIONERROR, error);
+    } else {
+        __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTED, COOLMIC_ERROR_NONE);
     }
 
     while (running == 1) {
         if ((error = coolmic_shout_iter(shout)) != COOLMIC_ERROR_NONE) {
             __emit_error_unlocked(self, &(self->thread), error);
+            __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTIONERROR, error);
             break;
         }
         ret = coolmic_vumeter_read(vumeter, -1);
@@ -244,9 +268,7 @@ static void *__worker(void *userdata)
         if (vumeter_iter == vumeter_interval) {
             vumeter_iter = 0;
             if (coolmic_vumeter_result(vumeter, &vumeter_result) == 0) {
-                pthread_mutex_lock(&(self->lock));
-                __emit_event(self, COOLMIC_SIMPLE_EVENT_VUMETER_RESULT, &(self->thread), &vumeter_result, NULL);
-                pthread_mutex_unlock(&(self->lock));
+                __emit_event_unlocked(self, COOLMIC_SIMPLE_EVENT_VUMETER_RESULT, &(self->thread), &vumeter_result, NULL);
             }
         }
 
@@ -261,10 +283,12 @@ static void *__worker(void *userdata)
     pthread_mutex_lock(&(self->lock));
     self->running = 0;
     self->need_reset = 1;
+    __emit_cs_locked(self, &(self->thread), COOLMIC_SIMPLE_CS_DISCONNECTING, COOLMIC_ERROR_NONE);
     coolmic_shout_stop(shout);
+    __emit_cs_locked(self, &(self->thread), COOLMIC_SIMPLE_CS_DISCONNECTED, COOLMIC_ERROR_NONE);
     coolmic_shout_unref(shout);
     coolmic_vumeter_unref(vumeter);
-    __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
+    __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
     self->thread_needs_join = 1;
     pthread_mutex_unlock(&(self->lock));
     return NULL;
@@ -281,7 +305,7 @@ int                 coolmic_simple_start(coolmic_simple_t *self)
     if (!self->running)
         if (pthread_create(&(self->thread), NULL, __worker, self) == 0) {
             self->running = 1;
-            __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_START, NULL, &(self->thread), NULL);
+            __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_START, NULL, &(self->thread), NULL);
         }
     running = self->running;
     pthread_mutex_unlock(&(self->lock));
@@ -293,7 +317,7 @@ int                 coolmic_simple_stop(coolmic_simple_t *self)
     if (!self)
         return COOLMIC_ERROR_FAULT;
     pthread_mutex_lock(&(self->lock));
-    __stop_unlocked(self);
+    __stop_locked(self);
     pthread_mutex_unlock(&(self->lock));
     return COOLMIC_ERROR_NONE;
 }
