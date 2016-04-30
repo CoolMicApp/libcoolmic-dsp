@@ -41,6 +41,7 @@ struct coolmic_simple {
     pthread_t thread;
     int running;
     int need_reset;
+    int thread_needs_join;
 
     coolmic_simple_callback_t callback;
     void *callback_userdata;
@@ -87,12 +88,13 @@ static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, i
 
 static void __stop_unlocked(coolmic_simple_t *self)
 {
-    if (!self->running)
+    if (!self->thread_needs_join && self->running != 1)
         return;
     self->running = 2;
     __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, NULL, &(self->thread), NULL);
     pthread_mutex_unlock(&(self->lock));
     pthread_join(self->thread, NULL);
+    self->thread_needs_join = 0;
     pthread_mutex_lock(&(self->lock));
 }
 
@@ -210,6 +212,7 @@ static void *__worker(void *userdata)
         if (__reset(self) != 0) {
             self->running = 0;
             __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
+            self->thread_needs_join = 1;
             pthread_mutex_unlock(&(self->lock));
             return NULL;
         }
@@ -262,6 +265,7 @@ static void *__worker(void *userdata)
     coolmic_shout_unref(shout);
     coolmic_vumeter_unref(vumeter);
     __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
+    self->thread_needs_join = 1;
     pthread_mutex_unlock(&(self->lock));
     return NULL;
 }
@@ -289,8 +293,7 @@ int                 coolmic_simple_stop(coolmic_simple_t *self)
     if (!self)
         return COOLMIC_ERROR_FAULT;
     pthread_mutex_lock(&(self->lock));
-    if (self->running)
-        __stop_unlocked(self);
+    __stop_unlocked(self);
     pthread_mutex_unlock(&(self->lock));
     return COOLMIC_ERROR_NONE;
 }
