@@ -135,12 +135,12 @@ static int __vorbis_read_data(coolmic_enc_t *self)
     ret = coolmic_iohandle_read(self->in, buffer, sizeof(buffer));
 
     if (ret < 1) {
-        vorbis_analysis_wrote(&(self->vd), 0);
         if (coolmic_iohandle_eof(self->in) == 1) {
+            vorbis_analysis_wrote(&(self->vd), 0);
             self->state = STATE_EOF;
             return -1;
         }
-        return 0;
+        return -2;
     }
 
     /* Have we got a strange nummber of bytes? */
@@ -177,12 +177,14 @@ static int __vorbis_process_flush(coolmic_enc_t *self)
 
 static int __vorbis_process(coolmic_enc_t *self)
 {
+    int err;
+
     if (__vorbis_process_flush(self))
         return 0;
 
     while (vorbis_analysis_blockout(&(self->vd), &(self->vb)) != 1) {
-        if (__vorbis_read_data(self) != 0) {
-            return -1;
+        if ((err = __vorbis_read_data(self)) != 0) {
+            return err;
         }
     }
 
@@ -195,9 +197,14 @@ static int __vorbis_process(coolmic_enc_t *self)
 
 static int __need_new_page(coolmic_enc_t *self)
 {
+    int ret;
+
     while (ogg_stream_pageout(&(self->os), &(self->og)) == 0) {
-        if (__vorbis_process(self) != 0) {
+        ret = __vorbis_process(self);
+        if (ret == -1) {
             self->offset_in_page = -1;
+            return -1;
+        } else if (ret == -2) {
             return -1;
         }
         if (self->state == STATE_NEED_RESET && ogg_page_eos(&(self->og))) {
