@@ -29,8 +29,10 @@
 #include <coolmic-dsp/simple.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/snddev.h>
+#include <coolmic-dsp/tee.h>
 #include <coolmic-dsp/enc.h>
 #include <coolmic-dsp/shout.h>
+#include <coolmic-dsp/vumeter.h>
 
 struct coolmic_simple {
     size_t refc;
@@ -43,9 +45,10 @@ struct coolmic_simple {
     void *callback_userdata;
 
     coolmic_snddev_t *dev;
+    coolmic_tee_t *tee;
     coolmic_enc_t *enc;
     coolmic_shout_t *shout;
-    coolmic_iohandle_t *pcm;
+    coolmic_vumeter_t *vumeter;
     coolmic_iohandle_t *ogg;
 };
 
@@ -80,6 +83,8 @@ static void __stop_unlocked(coolmic_simple_t *self)
 coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, unsigned int channels, ssize_t buffer, const coolmic_shout_config_t *conf)
 {
     coolmic_simple_t *ret = calloc(1, sizeof(coolmic_simple_t));
+    coolmic_iohandle_t *handle;
+
     if (!ret)
         return NULL;
 
@@ -93,16 +98,31 @@ coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, u
             break;
         if ((ret->shout = coolmic_shout_new()) == NULL)
             break;
-        if ((ret->pcm = coolmic_snddev_get_iohandle(ret->dev)) == NULL)
+        if ((ret->tee = coolmic_tee_new(2)) == NULL)
+            break;
+        if ((ret->vumeter = coolmic_vumeter_new(rate, channels)) == NULL)
             break;
         if ((ret->ogg = coolmic_enc_get_iohandle(ret->enc)) == NULL)
             break;
-        if (coolmic_enc_attach_iohandle(ret->enc, ret->pcm) != 0)
+        if ((handle = coolmic_snddev_get_iohandle(ret->dev)) == NULL)
             break;
+        if (coolmic_tee_attach_iohandle(ret->tee, handle) != 0)
+            break;
+        coolmic_iohandle_unref(handle);
+        if ((handle = coolmic_tee_get_iohandle(ret->tee, 0)) == NULL)
+            break;
+        if (coolmic_enc_attach_iohandle(ret->enc, handle) != 0)
+            break;
+        coolmic_iohandle_unref(handle);
         if (coolmic_shout_attach_iohandle(ret->shout, ret->ogg) != 0)
             break;
         if (coolmic_shout_set_config(ret->shout, conf) != 0)
             break;
+        if ((handle = coolmic_tee_get_iohandle(ret->tee, 1)) == NULL)
+            break;
+        if (coolmic_vumeter_attach_iohandle(ret->vumeter, handle) != 0)
+            break;
+        coolmic_iohandle_unref(handle);
         return ret;
     } while (0);
 
@@ -135,7 +155,6 @@ int                 coolmic_simple_unref(coolmic_simple_t *self)
 
     __stop_unlocked(self);
 
-    coolmic_iohandle_unref(self->pcm);
     coolmic_iohandle_unref(self->ogg);
     coolmic_shout_unref(self->shout);
     coolmic_enc_unref(self->enc);
@@ -162,6 +181,11 @@ static void *__worker(void *userdata)
     coolmic_simple_t *self = userdata;
     int running;
     coolmic_shout_t *shout;
+    coolmic_vumeter_t *vumeter;
+    size_t vumeter_iter = 1;
+    size_t vumeter_interval = 4;
+    ssize_t ret;
+    coolmic_vumeter_result_t vumeter_result;
 
     pthread_mutex_lock(&(self->lock));
     __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_POST_START, &(self->thread), NULL, NULL);
@@ -176,11 +200,27 @@ static void *__worker(void *userdata)
     running = self->running;
     coolmic_shout_ref(shout = self->shout);
     coolmic_shout_start(shout);
+    coolmic_vumeter_ref(vumeter = self->vumeter);
     pthread_mutex_unlock(&(self->lock));
 
     while (running == 1) {
         if (coolmic_shout_iter(shout) != 0)
             break;
+        ret = coolmic_vumeter_read(vumeter, -1);
+        if (ret < 0) {
+            break;
+        } else if (ret > 0) {
+            vumeter_iter++;
+        }
+
+        if (vumeter_iter == vumeter_interval) {
+            vumeter_iter = 0;
+            if (coolmic_vumeter_result(vumeter, &vumeter_result) == 0) {
+                pthread_mutex_lock(&(self->lock));
+                __emit_event(self, COOLMIC_SIMPLE_EVENT_VUMETER_RESULT, &(self->thread), &vumeter_result, NULL);
+                pthread_mutex_unlock(&(self->lock));
+            }
+        }
 
         pthread_mutex_lock(&(self->lock));
         if (self->need_reset)
@@ -197,6 +237,7 @@ static void *__worker(void *userdata)
     self->need_reset = 1;
     coolmic_shout_stop(shout);
     coolmic_shout_unref(shout);
+    coolmic_vumeter_unref(vumeter);
     __emit_event(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
     pthread_mutex_unlock(&(self->lock));
     return NULL;
