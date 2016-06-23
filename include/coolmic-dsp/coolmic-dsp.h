@@ -47,4 +47,7 @@
 #define COOLMIC_ERROR_NOTLS             (-17) /* TLS requested but not supported by peer */
 #define COOLMIC_ERROR_TLSBADCERT        (-18) /* TLS connection can not be established because of bad certificate */
 
+/* Return a static string describing the given error. */
+const char *coolmic_error2string(const int error);
+
 #endif

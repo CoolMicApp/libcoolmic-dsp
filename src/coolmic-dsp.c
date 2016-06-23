@@ -23,4 +23,37 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#include <sys/types.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+
+static const struct {
+    const int       error;
+    const char *    string;
+} __coolmic_errors[] = {
+/* grep '^#define COOLMIC_ERROR_' coolmic-dsp.h | sed 's/^#define \([^ ]*\) .*\/\* \(.*\) \*\/$/\1 \2/' | while read code msg; do printf "    {%-32s \"%s\"},\n" "$code", "$msg"; done */
+    {COOLMIC_ERROR_NONE,              "No error"},
+    {COOLMIC_ERROR_GENERIC,           "Generic, unknown error"},
+    {COOLMIC_ERROR_NOSYS,             "Function not implemented"},
+    {COOLMIC_ERROR_FAULT,             "Bad address"},
+    {COOLMIC_ERROR_INVAL,             "Invalid argument"},
+    {COOLMIC_ERROR_NOMEM,             "Not enough space"},
+    {COOLMIC_ERROR_BUSY,              "Device or resource busy"},
+    {COOLMIC_ERROR_PERM,              "Operation not permitted"},
+    {COOLMIC_ERROR_CONNREFUSED,       "Connection refused"},
+    {COOLMIC_ERROR_CONNECTED,         "Connected."},
+    {COOLMIC_ERROR_UNCONNECTED,       "Unconnected."},
+    {COOLMIC_ERROR_NOTLS,             "TLS requested but not supported by peer"},
+    {COOLMIC_ERROR_TLSBADCERT,        "TLS connection can not be established because of bad certificate"}
+};
+
+const char *coolmic_error2string(const int error) {
+    size_t i;
+
+    for (i = 0; i < (sizeof(__coolmic_errors)/sizeof(*__coolmic_errors)); i++) {
+        if (__coolmic_errors[i].error == error) {
+            return __coolmic_errors[i].string;
+        }
+    }
+
+    return "(unknown)";
+}
