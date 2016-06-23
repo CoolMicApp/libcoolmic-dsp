@@ -46,6 +46,8 @@ struct coolmic_simple {
     coolmic_simple_callback_t callback;
     void *callback_userdata;
 
+    size_t vumeter_interval;
+
     coolmic_snddev_t *dev;
     coolmic_tee_t *tee;
     coolmic_enc_t *enc;
@@ -127,6 +129,8 @@ coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, u
 
     ret->refc = 1;
     pthread_mutex_init(&(ret->lock), NULL);
+
+    ret->vumeter_interval = 20;
 
     do {
         if ((ret->dev = coolmic_snddev_new(COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, rate, channels, COOLMIC_DSP_SNDDEV_RX, buffer)) == NULL)
@@ -265,7 +269,7 @@ static void *__worker(void *userdata)
             vumeter_iter++;
         }
 
-        if (vumeter_iter == vumeter_interval) {
+        if (vumeter_interval && vumeter_iter == vumeter_interval) {
             vumeter_iter = 0;
             if (coolmic_vumeter_result(vumeter, &vumeter_result) == 0) {
                 __emit_event_unlocked(self, COOLMIC_SIMPLE_EVENT_VUMETER_RESULT, &(self->thread), &vumeter_result, NULL);
@@ -273,6 +277,11 @@ static void *__worker(void *userdata)
         }
 
         pthread_mutex_lock(&(self->lock));
+        if (vumeter_interval != self->vumeter_interval) {
+            vumeter_interval = self->vumeter_interval;
+            if (vumeter_interval)
+                vumeter_iter = vumeter_interval - 1;
+        }
         if (self->need_reset)
             if (__reset(self) != 0)
                 self->running = 0;
@@ -331,4 +340,24 @@ int                 coolmic_simple_set_callback(coolmic_simple_t *self, coolmic_
     self->callback_userdata = userdata;
     pthread_mutex_unlock(&(self->lock));
     return COOLMIC_ERROR_NONE;
+}
+
+int                 coolmic_simple_set_vumeter_interval(coolmic_simple_t *self, size_t vumeter_interval) {
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+    pthread_mutex_lock(&(self->lock));
+    self->vumeter_interval = vumeter_interval;
+    pthread_mutex_unlock(&(self->lock));
+    return COOLMIC_ERROR_NONE;
+}
+
+ssize_t             coolmic_simple_get_vumeter_interval(coolmic_simple_t *self) {
+    size_t ret;
+
+    if (!self)
+        return -1;
+    pthread_mutex_lock(&(self->lock));
+    ret = self->vumeter_interval;
+    pthread_mutex_unlock(&(self->lock));
+    return ret;
 }

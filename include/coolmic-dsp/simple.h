@@ -133,4 +133,15 @@ int                 coolmic_simple_stop(coolmic_simple_t *self);
 /* status callbacks */
 int                 coolmic_simple_set_callback(coolmic_simple_t *self, coolmic_simple_callback_t callback, void *userdata);
 
+/* VU-Meter control */
+/* This sets the VU-Meter interval.
+ * Useful values are in range of [10:400].
+ * Setting this to 0 disables regular VU-Meter events.
+ * Setting this to any value may cause a out of sync event to update values to the new interval.
+ */
+int                 coolmic_simple_set_vumeter_interval(coolmic_simple_t *self, size_t vumeter_interval);
+/* This sets the current VU-Meter interval.
+ */
+ssize_t             coolmic_simple_get_vumeter_interval(coolmic_simple_t *self);
+
 #endif
