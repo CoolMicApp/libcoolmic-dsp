@@ -47,7 +47,24 @@
 #define COOLMIC_ERROR_NOTLS             (-17) /* TLS requested but not supported by peer */
 #define COOLMIC_ERROR_TLSBADCERT        (-18) /* TLS connection can not be established because of bad certificate */
 
+/* Features */
+#define COOLMIC_FEATURE_ENCODE_OGG_VORBIS   "encode:ogg/vorbis" /* we can encode Ogg/Vorbis */
+#define COOLMIC_FEATURE_ENCODE_OGG_OPUS     "encode:ogg/opus"   /* we can encode Ogg/Opus */
+#define COOLMIC_FEATURE_DRIVER_NULL         "driver:null"       /* we support the null-driver */
+#define COOLMIC_FEATURE_DRIVER_OSS          "driver:oss"        /* we support the OSS-driver */
+#define COOLMIC_FEATURE_DRIVER_OPENSL       "driver:opensl"     /* we support the OpenSL-driver */
+#define COOLMIC_FEATURE_DRIVER_STDIO        "driver:stdio"      /* we support the stdio-driver */
+
 /* Return a static string describing the given error. */
 const char *coolmic_error2string(const int error);
+
+
+/* Returns a string with all the features compiled in. */
+const char *coolmic_features(void);
+
+/* Checks for a specific feature.
+ * Returns 1 if supported, 0 if not and negative numbers on errors.
+ */
+int coolmic_feature_check(const char *feature);
 
 #endif

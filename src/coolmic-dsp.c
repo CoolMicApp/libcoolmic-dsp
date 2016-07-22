@@ -24,6 +24,7 @@
 /* Please see the corresponding header file for details of this API. */
 
 #include <sys/types.h>
+#include <string.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
 static const struct {
@@ -56,4 +57,51 @@ const char *coolmic_error2string(const int error) {
     }
 
     return "(unknown)";
+}
+
+const char *coolmic_features(void)
+{
+    static const char *features = "features"
+        " " COOLMIC_FEATURE_ENCODE_OGG_VORBIS
+        " " COOLMIC_FEATURE_DRIVER_NULL
+#ifdef HAVE_SNDDRV_DRIVER_OSS
+        " " COOLMIC_FEATURE_DRIVER_OSS
+#endif
+#ifdef HAVE_SNDDRV_DRIVER_OPENSL
+        " " COOLMIC_FEATURE_DRIVER_OPENSL
+#endif
+#ifdef HAVE_SNDDRV_DRIVER_STDIO
+        " " COOLMIC_FEATURE_DRIVER_STDIO
+#endif
+    ;
+    return features;
+}
+
+int coolmic_feature_check(const char *feature)
+{
+    const char *p;
+    size_t len;
+
+    if (!feature)
+        return COOLMIC_ERROR_FAULT;
+    if (!*feature)
+        return COOLMIC_ERROR_INVAL;
+
+    len = strlen(feature);
+    p = coolmic_features();
+
+    while (*p) {
+        if (strncmp(feature, p, len) == 0) {
+            p += len;
+            if (*p == 0 || *p == ' ')
+                return 1;
+        }
+
+        p = strstr(p, " ");
+        if (!p)
+            return 0;
+        p++;
+    }
+
+    return 0;
 }
