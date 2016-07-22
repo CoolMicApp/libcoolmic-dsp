@@ -60,6 +60,10 @@ struct coolmic_enc {
 
     ssize_t offset_in_page;
 
+    int use_page_flush;  /* if set the next requests for pages will use flush not normal pageout.
+                          * This is reset when the buffer is empty again.
+                          */
+
     /* Vorbis: */
     vorbis_info      vi; /* struct that stores all the static vorbis bitstream
                             settings */
@@ -96,6 +100,7 @@ static int __vorbis_start_encoder(coolmic_enc_t *self)
     ogg_stream_packetin(&(self->os), &header_comm);
     ogg_stream_packetin(&(self->os), &header_code);
 
+    self->use_page_flush = 1;
     self->state = STATE_RUNNING;
 
     return 0;
@@ -198,8 +203,16 @@ static int __vorbis_process(coolmic_enc_t *self)
 static int __need_new_page(coolmic_enc_t *self)
 {
     int ret;
+    int (*pageout)(ogg_stream_state *, ogg_page *) = ogg_stream_pageout;
 
-    while (ogg_stream_pageout(&(self->os), &(self->og)) == 0) {
+    if (self->use_page_flush)
+        pageout = ogg_stream_flush;
+
+    while (pageout(&(self->os), &(self->og)) == 0) {
+        /* we reached end of buffer */
+        self->use_page_flush = 0; 
+        pageout = ogg_stream_pageout;
+
         ret = __vorbis_process(self);
         if (ret == -1) {
             self->offset_in_page = -1;
