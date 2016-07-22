@@ -341,6 +341,11 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
     return COOLMIC_ERROR_NONE;
 }
 
+int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ...)
+{
+    return COOLMIC_ERROR_NOSYS;
+}
+
 int                 coolmic_enc_attach_iohandle(coolmic_enc_t *self, coolmic_iohandle_t *handle)
 {
     if (!self)

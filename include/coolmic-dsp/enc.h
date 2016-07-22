@@ -38,6 +38,14 @@
 /* forward declare internally used structures */
 typedef struct coolmic_enc coolmic_enc_t;
 
+/* request codes for control function */
+typedef enum coolmic_enc_op {
+    /* invalid opcode */
+    COOLMIC_ENC_OP_INVALID    = -1,
+    /* no-op opcode */
+    COOLMIC_ENC_OP_NONE       =  0
+} coolmic_enc_op_t;
+
 /* Management of the encoder object */
 coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsigned int channels);
 int                 coolmic_enc_ref(coolmic_enc_t *self);
@@ -45,6 +53,8 @@ int                 coolmic_enc_unref(coolmic_enc_t *self);
 
 /* Reset the encoder state */
 int                 coolmic_enc_reset(coolmic_enc_t *self);
+/* control the encoder */
+int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ...);
 
 /* This is to attach the IO Handle of the PCM data stream that is to be passed to the encoder */
 int                 coolmic_enc_attach_iohandle(coolmic_enc_t *self, coolmic_iohandle_t *handle);
