@@ -25,6 +25,7 @@
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <coolmic-dsp/snddev.h>
 #include <coolmic-dsp/coolmic-dsp.h>
@@ -57,6 +58,9 @@ struct coolmic_snddev {
     /* IO Handles */
     coolmic_iohandle_t *rx; /* Device -data-> Handle */
     coolmic_iohandle_t *tx; /* Handle -data-> Device */
+    /* Buffer for TX */
+    char txbuffer[1024];
+    size_t txbuffer_fill;
 };
 
 static ssize_t __read(void *userdata, void *buffer, size_t len)
@@ -159,9 +163,48 @@ coolmic_iohandle_t *coolmic_snddev_get_iohandle(coolmic_snddev_t *self)
     return self->rx;
 }
 
+static inline int __flush_buffer(coolmic_snddev_t *self)
+{
+    ssize_t ret;
+
+    if (!self->txbuffer_fill)
+        return COOLMIC_ERROR_NONE;
+
+    ret = self->driver.write(&(self->driver), self->txbuffer, self->txbuffer_fill);
+    if (ret < 0) {
+        return COOLMIC_ERROR_GENERIC;
+    } else if (ret == 0) {
+        return COOLMIC_ERROR_BUSY;
+    } else if ((size_t)ret == self->txbuffer_fill) {
+        self->txbuffer_fill = 0;
+    } else {
+        memmove(self->txbuffer, self->txbuffer + ret, self->txbuffer_fill - ret);
+        self->txbuffer_fill -= ret;
+        return COOLMIC_ERROR_BUSY;
+    }
+
+    return COOLMIC_ERROR_NONE;
+}
+
 int                 coolmic_snddev_iter(coolmic_snddev_t *self)
 {
-    /* TODO */
-    (void)self;
-    return COOLMIC_ERROR_NOSYS;
+    int ret;
+
+    if (!self->driver.write)
+        return COOLMIC_ERROR_NOSYS;
+
+    ret = __flush_buffer(self);
+    if (ret != COOLMIC_ERROR_NONE)
+        return ret;
+
+    ret = coolmic_iohandle_read(self->tx, self->txbuffer, sizeof(self->txbuffer));
+    if (ret < 0) {
+        return COOLMIC_ERROR_GENERIC;
+    } else if (ret == 0) {
+        return COOLMIC_ERROR_NONE;
+    }
+
+    self->txbuffer_fill = ret;
+
+    return __flush_buffer(self);
 }
