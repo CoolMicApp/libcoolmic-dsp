@@ -50,11 +50,17 @@ typedef enum coolmic_enc_op {
     /* no-op opcode */
     COOLMIC_ENC_OP_NONE       =  0,
 
+    /* Object manipulation: 1-63 */
+
+    /* Codec parameters: 64-127 */
+
     /* get and set quality
      * Argument is (double) in range -0.1 to 1.0.
      */
-    COOLMIC_ENC_OP_GET_QUALITY = COOLMIC_ENC_OPCODE_GET(1),
-    COOLMIC_ENC_OP_SET_QUALITY = COOLMIC_ENC_OPCODE_SET(1)
+    COOLMIC_ENC_OP_GET_QUALITY = COOLMIC_ENC_OPCODE_GET(64),
+    COOLMIC_ENC_OP_SET_QUALITY = COOLMIC_ENC_OPCODE_SET(64)
+
+    /* Meta data: 128-191 */
 } coolmic_enc_op_t;
 
 /* Management of the encoder object */
