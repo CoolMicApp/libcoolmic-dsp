@@ -33,6 +33,7 @@
 #include <coolmic-dsp/enc.h>
 #include <coolmic-dsp/shout.h>
 #include <coolmic-dsp/vumeter.h>
+#include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
 struct coolmic_simple {
@@ -54,6 +55,7 @@ struct coolmic_simple {
     coolmic_shout_t *shout;
     coolmic_vumeter_t *vumeter;
     coolmic_iohandle_t *ogg;
+    coolmic_metadata_t *metadata;
 };
 
 /* emit an event */
@@ -133,9 +135,13 @@ coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, u
     ret->vumeter_interval = 20;
 
     do {
+        if ((ret->metadata = coolmic_metadata_new()) == NULL)
+            break;
         if ((ret->dev = coolmic_snddev_new(COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, rate, channels, COOLMIC_DSP_SNDDEV_RX, buffer)) == NULL)
             break;
         if ((ret->enc = coolmic_enc_new(codec, rate, channels)) == NULL)
+            break;
+        if (coolmic_enc_ctl(ret->enc, COOLMIC_ENC_OP_SET_METADATA, ret->metadata) != 0)
             break;
         if ((ret->shout = coolmic_shout_new()) == NULL)
             break;
@@ -200,6 +206,7 @@ int                 coolmic_simple_unref(coolmic_simple_t *self)
     coolmic_shout_unref(self->shout);
     coolmic_enc_unref(self->enc);
     coolmic_snddev_unref(self->dev);
+    coolmic_metadata_unref(self->metadata);
 
     pthread_mutex_unlock(&(self->lock));
     pthread_mutex_destroy(&(self->lock));
@@ -392,4 +399,36 @@ double              coolmic_simple_get_quality(coolmic_simple_t *self)
         return -2048.;
 
     return quality;
+}
+
+int                 coolmic_simple_set_meta(coolmic_simple_t *self, const char *key, const char *value, int replace)
+{
+    int ret;
+
+    if (!self || !key || !value)
+        return COOLMIC_ERROR_FAULT;
+
+    pthread_mutex_lock(&(self->lock));
+    if (replace) {
+        ret = coolmic_metadata_tag_set(self->metadata, key, value);
+    } else {
+        ret = coolmic_metadata_tag_add(self->metadata, key, value);
+    }
+    pthread_mutex_unlock(&(self->lock));
+
+    return ret;
+}
+
+int                 coolmic_simple_restart_encoder(coolmic_simple_t *self)
+{
+    int ret;
+
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    pthread_mutex_lock(&(self->lock));
+    coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_RESTART);
+    pthread_mutex_unlock(&(self->lock));
+
+    return ret;
 }
