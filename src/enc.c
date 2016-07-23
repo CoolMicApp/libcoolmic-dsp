@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdarg.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/enc.h>
 #include <vorbis/vorbisenc.h>
@@ -343,19 +344,26 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
 
 int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ...)
 {
+    va_list ap;
+    int ret = COOLMIC_ERROR_BADRQC;
+
     if (!self)
         return COOLMIC_ERROR_FAULT;
 
+    va_start(ap, op);
+
     switch (op) {
         case COOLMIC_ENC_OP_INVALID:
-            return COOLMIC_ERROR_INVAL;
+            ret = COOLMIC_ERROR_INVAL;
         break;
         case COOLMIC_ENC_OP_NONE:
-            return COOLMIC_ERROR_NONE;
+            ret = COOLMIC_ERROR_NONE;
         break;
     }
 
-    return COOLMIC_ERROR_BADRQC;
+    va_end(ap);
+
+    return ret;
 }
 
 int                 coolmic_enc_attach_iohandle(coolmic_enc_t *self, coolmic_iohandle_t *handle)
