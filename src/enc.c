@@ -72,6 +72,8 @@ struct coolmic_enc {
 
     vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
     vorbis_block     vb; /* local working space for packet->PCM decode */
+
+    float quality;       /* quality level, -0.1 to 1.0 */
 };
 
 static int __vorbis_start_encoder(coolmic_enc_t *self)
@@ -84,7 +86,7 @@ static int __vorbis_start_encoder(coolmic_enc_t *self)
         return -1;
 
     vorbis_info_init(&(self->vi));
-    if (vorbis_encode_init_vbr(&(self->vi), self->channels, self->rate, 0.1) != 0)
+    if (vorbis_encode_init_vbr(&(self->vi), self->channels, self->rate, self->quality) != 0)
         return -1;
 
     vorbis_comment_init(&(self->vc));
@@ -289,6 +291,7 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->state = STATE_NEED_INIT;
     ret->rate = rate;
     ret->channels = channels;
+    ret->quality  = 0.1;
 
     __vorbis_start_encoder(ret);
 
@@ -346,6 +349,9 @@ int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ..
 {
     va_list ap;
     int ret = COOLMIC_ERROR_BADRQC;
+    union {
+        double *fp;
+    } tmp;
 
     if (!self)
         return COOLMIC_ERROR_FAULT;
@@ -357,6 +363,15 @@ int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ..
             ret = COOLMIC_ERROR_INVAL;
         break;
         case COOLMIC_ENC_OP_NONE:
+            ret = COOLMIC_ERROR_NONE;
+        break;
+        case COOLMIC_ENC_OP_GET_QUALITY:
+            tmp.fp = va_arg(ap, double*);
+            *(tmp.fp) = self->quality;
+            ret = COOLMIC_ERROR_NONE;
+        break;
+        case COOLMIC_ENC_OP_SET_QUALITY:
+            self->quality = va_arg(ap, double);
             ret = COOLMIC_ERROR_NONE;
         break;
     }
