@@ -144,4 +144,11 @@ int                 coolmic_simple_set_vumeter_interval(coolmic_simple_t *self, 
  */
 ssize_t             coolmic_simple_get_vumeter_interval(coolmic_simple_t *self);
 
+/* Quality level */
+/* This sets quality level for quality based codecs such as Vorbis.
+ * Range is from -0.1 to 1.0.
+ */
+int                 coolmic_simple_set_quality(coolmic_simple_t *self, double quality);
+double              coolmic_simple_get_quality(coolmic_simple_t *self);
+
 #endif

@@ -361,3 +361,35 @@ ssize_t             coolmic_simple_get_vumeter_interval(coolmic_simple_t *self) 
     pthread_mutex_unlock(&(self->lock));
     return ret;
 }
+
+int                 coolmic_simple_set_quality(coolmic_simple_t *self, double quality)
+{
+    int ret;
+
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    pthread_mutex_lock(&(self->lock));
+    ret = coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_SET_QUALITY, quality);
+    pthread_mutex_unlock(&(self->lock));
+
+    return ret;
+}
+
+double              coolmic_simple_get_quality(coolmic_simple_t *self)
+{
+    int ret;
+    double quality;
+
+    if (!self)
+        return -1024.;
+    
+    pthread_mutex_lock(&(self->lock));
+    ret = coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_GET_QUALITY, &quality);
+    pthread_mutex_unlock(&(self->lock));
+
+    if (ret != COOLMIC_ERROR_NONE)
+        return -2048.;
+
+    return quality;
+}
