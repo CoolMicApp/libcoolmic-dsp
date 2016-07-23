@@ -36,7 +36,8 @@ typedef enum coolmic_enc_state {
     STATE_NEED_INIT = 0,
     STATE_RUNNING,
     STATE_EOF,
-    STATE_NEED_RESET
+    STATE_NEED_RESET,
+    STATE_NEED_RESTART
 } coolmic_enc_state_t;
 
 struct coolmic_enc {
@@ -135,7 +136,7 @@ static int __vorbis_read_data(coolmic_enc_t *self)
     unsigned int c;
     size_t i = 0;
 
-    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET) {
+    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART) {
         vorbis_analysis_wrote(&(self->vd), 0);
         return 0;
     }
@@ -217,6 +218,9 @@ static int __need_new_page(coolmic_enc_t *self)
     if (self->state == STATE_EOF && ogg_page_eos(&(self->og)))
         return -2; /* EOF */
 
+    if (self->state == STATE_NEED_RESTART && ogg_page_eos(&(self->og)))
+        self->state = STATE_NEED_RESET;
+
     while (pageout(&(self->os), &(self->og)) == 0) {
         /* we reached end of buffer */
         self->use_page_flush = 0; 
@@ -225,6 +229,7 @@ static int __need_new_page(coolmic_enc_t *self)
         if (self->state == STATE_NEED_RESET) {
             __vorbis_stop_encoder(self);
             __vorbis_start_encoder(self);
+            return -2;
         }
 
         ret = __vorbis_process(self);
@@ -358,6 +363,16 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
     return COOLMIC_ERROR_NONE;
 }
 
+static inline int __restart(coolmic_enc_t *self)
+{
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+    if (self->state != STATE_RUNNING && self->state != STATE_EOF)
+        return COOLMIC_ERROR_GENERIC;
+    self->state = STATE_NEED_RESTART;
+    return COOLMIC_ERROR_NONE;
+}
+
 int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ...)
 {
     va_list ap;
@@ -377,6 +392,12 @@ int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ..
         break;
         case COOLMIC_ENC_OP_NONE:
             ret = COOLMIC_ERROR_NONE;
+        break;
+        case COOLMIC_ENC_OP_RESET:
+            ret = coolmic_enc_reset(self);
+        break;
+        case COOLMIC_ENC_OP_RESTART:
+            ret = __restart(self);
         break;
         case COOLMIC_ENC_OP_GET_QUALITY:
             tmp.fp = va_arg(ap, double*);
