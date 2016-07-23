@@ -343,7 +343,19 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
 
 int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ...)
 {
-    return COOLMIC_ERROR_NOSYS;
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    switch (op) {
+        case COOLMIC_ENC_OP_INVALID:
+            return COOLMIC_ERROR_INVAL;
+        break;
+        case COOLMIC_ENC_OP_NONE:
+            return COOLMIC_ERROR_NONE;
+        break;
+    }
+
+    return COOLMIC_ERROR_BADRQC;
 }
 
 int                 coolmic_enc_attach_iohandle(coolmic_enc_t *self, coolmic_iohandle_t *handle)
