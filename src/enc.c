@@ -211,10 +211,21 @@ static int __need_new_page(coolmic_enc_t *self)
     if (self->use_page_flush)
         pageout = ogg_stream_flush;
 
+    if (self->state == STATE_NEED_INIT)
+        __vorbis_start_encoder(self);
+
+    if (self->state == STATE_EOF && ogg_page_eos(&(self->og)))
+        return -2; /* EOF */
+
     while (pageout(&(self->os), &(self->og)) == 0) {
         /* we reached end of buffer */
         self->use_page_flush = 0; 
         pageout = ogg_stream_pageout;
+
+        if (self->state == STATE_NEED_RESET) {
+            __vorbis_stop_encoder(self);
+            __vorbis_start_encoder(self);
+        }
 
         ret = __vorbis_process(self);
         if (ret == -1) {
@@ -222,10 +233,6 @@ static int __need_new_page(coolmic_enc_t *self)
             return -1;
         } else if (ret == -2) {
             return -1;
-        }
-        if (self->state == STATE_NEED_RESET && ogg_page_eos(&(self->og))) {
-            __vorbis_stop_encoder(self);
-            __vorbis_start_encoder(self);
         }
     }
 
@@ -238,13 +245,19 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
     coolmic_enc_t *self = userdata;
     size_t offset;
     size_t max_len;
+    int ret;
 
     if (self->offset_in_page == -1)
         return COOLMIC_ERROR_GENERIC;
 
-    if (self->offset_in_page == (self->og.header_len + self->og.body_len))
-        if (__need_new_page(self) == -1)
+    if (self->state == STATE_NEED_INIT || self->offset_in_page == (self->og.header_len + self->og.body_len)) {
+        ret = __need_new_page(self);
+        if (ret == -2) {
+            return 0;
+        } else if (ret == -1) {
             return COOLMIC_ERROR_GENERIC;
+        }
+    }
 
     if (self->offset_in_page < self->og.header_len) {
         max_len = self->og.header_len - self->offset_in_page;
@@ -293,8 +306,6 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->channels = channels;
     ret->quality  = 0.1;
 
-    __vorbis_start_encoder(ret);
-
     coolmic_enc_ref(ret);
     ret->out = coolmic_iohandle_new(ret, (int (*)(void*))coolmic_enc_unref, __read, __eof);
 
@@ -342,6 +353,8 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
             break;
 
     self->state = STATE_NEED_RESET;
+    __need_new_page(self); /* buffer the first page of the new segment. */
+
     return COOLMIC_ERROR_NONE;
 }
 
