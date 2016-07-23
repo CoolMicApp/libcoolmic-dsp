@@ -60,9 +60,15 @@ typedef enum coolmic_enc_op {
      * Argument is (double) in range -0.1 to 1.0.
      */
     COOLMIC_ENC_OP_GET_QUALITY = COOLMIC_ENC_OPCODE_GET(64),
-    COOLMIC_ENC_OP_SET_QUALITY = COOLMIC_ENC_OPCODE_SET(64)
+    COOLMIC_ENC_OP_SET_QUALITY = COOLMIC_ENC_OPCODE_SET(64),
 
     /* Meta data: 128-191 */
+
+    /* get and set metadata object
+     * Argument is (coolmic_metadata_t*).
+     */
+    COOLMIC_ENC_OP_GET_METADATA = COOLMIC_ENC_OPCODE_GET(128),
+    COOLMIC_ENC_OP_SET_METADATA = COOLMIC_ENC_OPCODE_SET(128)
 } coolmic_enc_op_t;
 
 /* Management of the encoder object */

@@ -29,6 +29,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/enc.h>
 #include <vorbis/vorbisenc.h>
 
@@ -75,6 +76,8 @@ struct coolmic_enc {
     vorbis_block     vb; /* local working space for packet->PCM decode */
 
     float quality;       /* quality level, -0.1 to 1.0 */
+
+    coolmic_metadata_t *metadata;
 };
 
 static int __vorbis_start_encoder(coolmic_enc_t *self)
@@ -92,6 +95,8 @@ static int __vorbis_start_encoder(coolmic_enc_t *self)
 
     vorbis_comment_init(&(self->vc));
     vorbis_comment_add_tag(&(self->vc), "ENCODER", "libcoolmic-dsp");
+    if (self->metadata)
+        coolmic_metadata_add_to_vorbis_comment(self->metadata, &(self->vc));
 
     vorbis_analysis_init(&(self->vd), &(self->vi));
     vorbis_block_init(&(self->vd), &(self->vb));
@@ -337,6 +342,7 @@ int                 coolmic_enc_unref(coolmic_enc_t *self)
 
     coolmic_iohandle_unref(self->in);
     coolmic_iohandle_unref(self->out);
+    coolmic_metadata_unref(self->metadata);
     free(self);
 
     return COOLMIC_ERROR_NONE;
@@ -379,6 +385,8 @@ int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ..
     int ret = COOLMIC_ERROR_BADRQC;
     union {
         double *fp;
+        coolmic_metadata_t *md;
+        coolmic_metadata_t **mdp;
     } tmp;
 
     if (!self)
@@ -407,6 +415,24 @@ int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ..
         case COOLMIC_ENC_OP_SET_QUALITY:
             self->quality = va_arg(ap, double);
             ret = COOLMIC_ERROR_NONE;
+        break;
+        case COOLMIC_ENC_OP_GET_METADATA:
+            tmp.mdp = va_arg(ap, coolmic_metadata_t**);
+            ret = coolmic_metadata_ref(*(tmp.mdp) = self->metadata);
+        break;
+        case COOLMIC_ENC_OP_SET_METADATA:
+            tmp.md = va_arg(ap, coolmic_metadata_t*);
+            if (tmp.md) {
+                ret = coolmic_metadata_ref(tmp.md);
+                if (ret == COOLMIC_ERROR_NONE) {
+                    coolmic_metadata_unref(self->metadata);
+                    self->metadata = tmp.md;
+                }
+            } else {
+                coolmic_metadata_unref(self->metadata);
+                self->metadata = NULL;
+                ret = COOLMIC_ERROR_NONE;
+            }
         break;
     }
 
