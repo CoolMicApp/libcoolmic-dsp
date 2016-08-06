@@ -144,4 +144,25 @@ int                 coolmic_simple_set_vumeter_interval(coolmic_simple_t *self, 
  */
 ssize_t             coolmic_simple_get_vumeter_interval(coolmic_simple_t *self);
 
+/* Quality level */
+/* This sets quality level for quality based codecs such as Vorbis.
+ * Range is from -0.1 to 1.0.
+ */
+int                 coolmic_simple_set_quality(coolmic_simple_t *self, double quality);
+double              coolmic_simple_get_quality(coolmic_simple_t *self);
+
+/* Simple metadata function */
+/* This allows very simple manipulation of the meta data.
+ * If replace is false the value is added to the key. If true the value is replaced by the new one.
+ */
+int                 coolmic_simple_set_meta(coolmic_simple_t *self, const char *key, const char *value, int replace);
+
+/* Restart the encoder */
+/* This is used to apply quality changes as well as meta data changes.
+ * Call this after you fisnihed changeing encoder settings such as quality or meta data.
+ * This does not reconnect to the streaming server (e.g. Icecast2) or cause interrupts on the
+ * listeners end.
+ */
+int                 coolmic_simple_restart_encoder(coolmic_simple_t *self);
+
 #endif

@@ -27,7 +27,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <stdarg.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/enc.h>
 #include <vorbis/vorbisenc.h>
 
@@ -35,7 +37,8 @@ typedef enum coolmic_enc_state {
     STATE_NEED_INIT = 0,
     STATE_RUNNING,
     STATE_EOF,
-    STATE_NEED_RESET
+    STATE_NEED_RESET,
+    STATE_NEED_RESTART
 } coolmic_enc_state_t;
 
 struct coolmic_enc {
@@ -71,6 +74,10 @@ struct coolmic_enc {
 
     vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
     vorbis_block     vb; /* local working space for packet->PCM decode */
+
+    float quality;       /* quality level, -0.1 to 1.0 */
+
+    coolmic_metadata_t *metadata;
 };
 
 static int __vorbis_start_encoder(coolmic_enc_t *self)
@@ -83,11 +90,13 @@ static int __vorbis_start_encoder(coolmic_enc_t *self)
         return -1;
 
     vorbis_info_init(&(self->vi));
-    if (vorbis_encode_init_vbr(&(self->vi), self->channels, self->rate, 0.1) != 0)
+    if (vorbis_encode_init_vbr(&(self->vi), self->channels, self->rate, self->quality) != 0)
         return -1;
 
     vorbis_comment_init(&(self->vc));
     vorbis_comment_add_tag(&(self->vc), "ENCODER", "libcoolmic-dsp");
+    if (self->metadata)
+        coolmic_metadata_add_to_vorbis_comment(self->metadata, &(self->vc));
 
     vorbis_analysis_init(&(self->vd), &(self->vi));
     vorbis_block_init(&(self->vd), &(self->vb));
@@ -132,7 +141,7 @@ static int __vorbis_read_data(coolmic_enc_t *self)
     unsigned int c;
     size_t i = 0;
 
-    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET) {
+    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART) {
         vorbis_analysis_wrote(&(self->vd), 0);
         return 0;
     }
@@ -208,10 +217,25 @@ static int __need_new_page(coolmic_enc_t *self)
     if (self->use_page_flush)
         pageout = ogg_stream_flush;
 
+    if (self->state == STATE_NEED_INIT)
+        __vorbis_start_encoder(self);
+
+    if (self->state == STATE_EOF && ogg_page_eos(&(self->og)))
+        return -2; /* EOF */
+
+    if (self->state == STATE_NEED_RESTART && ogg_page_eos(&(self->og)))
+        self->state = STATE_NEED_RESET;
+
     while (pageout(&(self->os), &(self->og)) == 0) {
         /* we reached end of buffer */
         self->use_page_flush = 0; 
         pageout = ogg_stream_pageout;
+
+        if (self->state == STATE_NEED_RESET) {
+            __vorbis_stop_encoder(self);
+            __vorbis_start_encoder(self);
+            return -2;
+        }
 
         ret = __vorbis_process(self);
         if (ret == -1) {
@@ -219,10 +243,6 @@ static int __need_new_page(coolmic_enc_t *self)
             return -1;
         } else if (ret == -2) {
             return -1;
-        }
-        if (self->state == STATE_NEED_RESET && ogg_page_eos(&(self->og))) {
-            __vorbis_stop_encoder(self);
-            __vorbis_start_encoder(self);
         }
     }
 
@@ -235,13 +255,19 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
     coolmic_enc_t *self = userdata;
     size_t offset;
     size_t max_len;
+    int ret;
 
     if (self->offset_in_page == -1)
         return COOLMIC_ERROR_GENERIC;
 
-    if (self->offset_in_page == (self->og.header_len + self->og.body_len))
-        if (__need_new_page(self) == -1)
+    if (self->state == STATE_NEED_INIT || self->offset_in_page == (self->og.header_len + self->og.body_len)) {
+        ret = __need_new_page(self);
+        if (ret == -2) {
+            return 0;
+        } else if (ret == -1) {
             return COOLMIC_ERROR_GENERIC;
+        }
+    }
 
     if (self->offset_in_page < self->og.header_len) {
         max_len = self->og.header_len - self->offset_in_page;
@@ -288,8 +314,7 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->state = STATE_NEED_INIT;
     ret->rate = rate;
     ret->channels = channels;
-
-    __vorbis_start_encoder(ret);
+    ret->quality  = 0.1;
 
     coolmic_enc_ref(ret);
     ret->out = coolmic_iohandle_new(ret, (int (*)(void*))coolmic_enc_unref, __read, __eof);
@@ -317,6 +342,7 @@ int                 coolmic_enc_unref(coolmic_enc_t *self)
 
     coolmic_iohandle_unref(self->in);
     coolmic_iohandle_unref(self->out);
+    coolmic_metadata_unref(self->metadata);
     free(self);
 
     return COOLMIC_ERROR_NONE;
@@ -338,7 +364,81 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
             break;
 
     self->state = STATE_NEED_RESET;
+    __need_new_page(self); /* buffer the first page of the new segment. */
+
     return COOLMIC_ERROR_NONE;
+}
+
+static inline int __restart(coolmic_enc_t *self)
+{
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+    if (self->state != STATE_RUNNING && self->state != STATE_EOF)
+        return COOLMIC_ERROR_GENERIC;
+    self->state = STATE_NEED_RESTART;
+    return COOLMIC_ERROR_NONE;
+}
+
+int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ...)
+{
+    va_list ap;
+    int ret = COOLMIC_ERROR_BADRQC;
+    union {
+        double *fp;
+        coolmic_metadata_t *md;
+        coolmic_metadata_t **mdp;
+    } tmp;
+
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    va_start(ap, op);
+
+    switch (op) {
+        case COOLMIC_ENC_OP_INVALID:
+            ret = COOLMIC_ERROR_INVAL;
+        break;
+        case COOLMIC_ENC_OP_NONE:
+            ret = COOLMIC_ERROR_NONE;
+        break;
+        case COOLMIC_ENC_OP_RESET:
+            ret = coolmic_enc_reset(self);
+        break;
+        case COOLMIC_ENC_OP_RESTART:
+            ret = __restart(self);
+        break;
+        case COOLMIC_ENC_OP_GET_QUALITY:
+            tmp.fp = va_arg(ap, double*);
+            *(tmp.fp) = self->quality;
+            ret = COOLMIC_ERROR_NONE;
+        break;
+        case COOLMIC_ENC_OP_SET_QUALITY:
+            self->quality = va_arg(ap, double);
+            ret = COOLMIC_ERROR_NONE;
+        break;
+        case COOLMIC_ENC_OP_GET_METADATA:
+            tmp.mdp = va_arg(ap, coolmic_metadata_t**);
+            ret = coolmic_metadata_ref(*(tmp.mdp) = self->metadata);
+        break;
+        case COOLMIC_ENC_OP_SET_METADATA:
+            tmp.md = va_arg(ap, coolmic_metadata_t*);
+            if (tmp.md) {
+                ret = coolmic_metadata_ref(tmp.md);
+                if (ret == COOLMIC_ERROR_NONE) {
+                    coolmic_metadata_unref(self->metadata);
+                    self->metadata = tmp.md;
+                }
+            } else {
+                coolmic_metadata_unref(self->metadata);
+                self->metadata = NULL;
+                ret = COOLMIC_ERROR_NONE;
+            }
+        break;
+    }
+
+    va_end(ap);
+
+    return ret;
 }
 
 int                 coolmic_enc_attach_iohandle(coolmic_enc_t *self, coolmic_iohandle_t *handle)
