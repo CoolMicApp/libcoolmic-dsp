@@ -76,13 +76,18 @@ struct coolmic_enc {
     /* Callbacks: */
     coolmic_enc_cb_t cb;
 
-    /* Vorbis: */
-    vorbis_info      vi; /* struct that stores all the static vorbis bitstream
-                            settings */
-    vorbis_comment   vc; /* struct that stores all the user comments */
+    /* Codec private data: */
+    union {
+        /* Vorbis: */
+        struct {
+        vorbis_info      vi; /* struct that stores all the static vorbis bitstream
+                                settings */
+        vorbis_comment   vc; /* struct that stores all the user comments */
 
-    vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
-    vorbis_block     vb; /* local working space for packet->PCM decode */
+        vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
+        vorbis_block     vb; /* local working space for packet->PCM decode */
+        } vorbis;
+    } codec;
 
     float quality;       /* quality level, -0.1 to 1.0 */
 
