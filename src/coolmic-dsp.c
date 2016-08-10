@@ -65,6 +65,9 @@ const char *coolmic_features(void)
 {
     static const char *features = "features"
         " " COOLMIC_FEATURE_ENCODE_OGG_VORBIS
+#ifdef HAVE_ENC_OPUS
+        " " COOLMIC_FEATURE_ENCODE_OGG_OPUS
+#endif
         " " COOLMIC_FEATURE_DRIVER_NULL
 #ifdef HAVE_SNDDRV_DRIVER_OSS
         " " COOLMIC_FEATURE_DRIVER_OSS
