@@ -64,15 +64,21 @@ static int libshouterror2error(const int err) {
         case SHOUTERR_BUSY:
             return COOLMIC_ERROR_BUSY;
         break;
+#ifdef SHOUTERR_NOTLS
         case SHOUTERR_NOTLS:
             return COOLMIC_ERROR_NOTLS;
         break;
+#endif
+#ifdef SHOUTERR_TLSBADCERT
         case SHOUTERR_TLSBADCERT:
             return COOLMIC_ERROR_TLSBADCERT;
         break;
+#endif
         case SHOUTERR_SOCKET:
         case SHOUTERR_METADATA:
+#ifdef SHOUTERR_RETRY
         case SHOUTERR_RETRY:
+#endif
         default:
             return COOLMIC_ERROR_GENERIC;
         break;
@@ -117,6 +123,7 @@ int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_s
     if (shout_set_port(self->shout, conf->port) != SHOUTERR_SUCCESS)
         return libshout2error(self);
 
+#ifdef SHOUT_TLS
     if (shout_set_tls(self->shout, conf->tlsmode) != SHOUTERR_SUCCESS)
         return libshout2error(self);
 
@@ -128,6 +135,16 @@ int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_s
         if (shout_set_ca_file(self->shout, conf->cafile) != SHOUTERR_SUCCESS)
             return libshout2error(self);
 
+    if (conf->client_cert)
+        if (shout_set_client_certificate(self->shout, conf->client_cert) != SHOUTERR_SUCCESS)
+            return libshout2error(self);
+#else
+    if (!(conf->tlsmode == 0 || conf->tlsmode == 1)) /* 0 = plain, 1 = auto (plain allowed) */
+        return COOLMIC_ERROR_NOSYS;
+    if (conf->cadir || conf->cafile || conf->cafile)
+        return COOLMIC_ERROR_NOSYS;
+#endif
+
     if (shout_set_mount(self->shout, conf->mount) != SHOUTERR_SUCCESS)
         return libshout2error(self);
 
@@ -137,10 +154,6 @@ int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_s
 
     if (shout_set_password(self->shout, conf->password) != SHOUTERR_SUCCESS)
         return libshout2error(self);
-
-    if (conf->client_cert)
-        if (shout_set_client_certificate(self->shout, conf->client_cert) != SHOUTERR_SUCCESS)
-            return libshout2error(self);
 
     return COOLMIC_ERROR_NONE;
 }
