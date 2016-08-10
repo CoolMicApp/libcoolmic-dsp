@@ -29,184 +29,42 @@
 #include <time.h>
 #include <stdarg.h>
 #include <coolmic-dsp/coolmic-dsp.h>
-#include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/enc.h>
-#include <vorbis/vorbisenc.h>
+#include "enc_private.h"
 
-typedef enum coolmic_enc_state {
-    STATE_NEED_INIT = 0,
-    STATE_RUNNING,
-    STATE_EOF,
-    STATE_NEED_RESET,
-    STATE_NEED_RESTART
-} coolmic_enc_state_t;
-
-struct coolmic_enc {
-    size_t refc;
-
-    /* overall state */
-    coolmic_enc_state_t state;
-
-    /* Audio */
-    uint_least32_t rate;
-    unsigned int channels;
-
-    /* IO Handles */
-    coolmic_iohandle_t *in;
-    coolmic_iohandle_t *out;
-
-    /* Ogg: */
-    ogg_stream_state os; /* take physical pages, weld into a logical
-                            stream of packets */
-    ogg_page         og; /* one Ogg bitstream page.  Vorbis packets are inside */
-    ogg_packet       op; /* one raw packet of data for decode */
-
-    ssize_t offset_in_page;
-
-    int use_page_flush;  /* if set the next requests for pages will use flush not normal pageout.
-                          * This is reset when the buffer is empty again.
-                          */
-
-    /* Vorbis: */
-    vorbis_info      vi; /* struct that stores all the static vorbis bitstream
-                            settings */
-    vorbis_comment   vc; /* struct that stores all the user comments */
-
-    vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
-    vorbis_block     vb; /* local working space for packet->PCM decode */
-
-    float quality;       /* quality level, -0.1 to 1.0 */
-
-    coolmic_metadata_t *metadata;
-};
-
-static int __vorbis_start_encoder(coolmic_enc_t *self)
+static int __start(coolmic_enc_t *self)
 {
-    ogg_packet header;
-    ogg_packet header_comm;
-    ogg_packet header_code;
+    int ret;
 
     if (self->state != STATE_NEED_INIT)
         return -1;
 
-    vorbis_info_init(&(self->vi));
-    if (vorbis_encode_init_vbr(&(self->vi), self->channels, self->rate, self->quality) != 0)
-        return -1;
-
-    vorbis_comment_init(&(self->vc));
-    vorbis_comment_add_tag(&(self->vc), "ENCODER", "libcoolmic-dsp");
-    if (self->metadata)
-        coolmic_metadata_add_to_vorbis_comment(self->metadata, &(self->vc));
-
-    vorbis_analysis_init(&(self->vd), &(self->vi));
-    vorbis_block_init(&(self->vd), &(self->vb));
-
     srand(time(NULL)); /* TODO FIXME: move this out */
     ogg_stream_init(&(self->os), rand());
 
-    vorbis_analysis_headerout(&(self->vd), &(self->vc), &header, &header_comm, &header_code);
-    ogg_stream_packetin(&(self->os), &header); /* automatically placed in its own page */
-    ogg_stream_packetin(&(self->os), &header_comm);
-    ogg_stream_packetin(&(self->os), &header_code);
+    ret = self->cb.start(self);
+    if (ret != COOLMIC_ERROR_NONE)
+        return ret;
 
-    self->use_page_flush = 1;
     self->state = STATE_RUNNING;
 
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
-static int __vorbis_stop_encoder(coolmic_enc_t *self)
+static int __stop(coolmic_enc_t *self)
 {
+    int ret;
+
+    ret = self->cb.stop(self);
+    if (ret != COOLMIC_ERROR_NONE)
+        return ret;
+
     ogg_stream_clear(&(self->os));
-    vorbis_block_clear(&(self->vb));
-    vorbis_dsp_clear(&(self->vd));
-    vorbis_comment_clear(&(self->vc));
-    vorbis_info_clear(&(self->vi));
-
     memset(&(self->os), 0, sizeof(self->os));
-    memset(&(self->vb), 0, sizeof(self->vb));
-    memset(&(self->vd), 0, sizeof(self->vd));
-    memset(&(self->vc), 0, sizeof(self->vc));
-    memset(&(self->vi), 0, sizeof(self->vi));
+
     self->state = STATE_NEED_INIT;
-    return 0;
-}
 
-static int __vorbis_read_data(coolmic_enc_t *self)
-{
-    char buffer[1024];
-    ssize_t ret;
-    float **vbuffer;
-    const int16_t *in = (int16_t*)buffer;
-    unsigned int c;
-    size_t i = 0;
-
-    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART) {
-        vorbis_analysis_wrote(&(self->vd), 0);
-        return 0;
-    }
-
-    ret = coolmic_iohandle_read(self->in, buffer, sizeof(buffer));
-
-    if (ret < 1) {
-        if (coolmic_iohandle_eof(self->in) == 1) {
-            vorbis_analysis_wrote(&(self->vd), 0);
-            self->state = STATE_EOF;
-            return -1;
-        }
-        return -2;
-    }
-
-    /* Have we got a strange nummber of bytes? */
-    if (ret % (2 * self->channels)) {
-        self->offset_in_page = -1;
-        return -1;
-    }
-
-    vbuffer = vorbis_analysis_buffer(&(self->vd), ret / (2 * self->channels));
-
-    while (ret) {
-        for (c = 0; c < self->channels; c++)
-            vbuffer[c][i] = *(in++) / 32768.f;
-        i++;
-        ret -= 2 * self->channels;
-    }
-
-    vorbis_analysis_wrote(&(self->vd), i);
-
-    return 0;
-}
-
-static int __vorbis_process_flush(coolmic_enc_t *self)
-{
-    int ret = 0;
-
-    while (vorbis_bitrate_flushpacket(&(self->vd), &(self->op))){
-        ogg_stream_packetin(&(self->os), &(self->op));
-        ret = 1;
-    }
-
-    return ret;
-}
-
-static int __vorbis_process(coolmic_enc_t *self)
-{
-    int err;
-
-    if (__vorbis_process_flush(self))
-        return 0;
-
-    while (vorbis_analysis_blockout(&(self->vd), &(self->vb)) != 1) {
-        if ((err = __vorbis_read_data(self)) != 0) {
-            return err;
-        }
-    }
-
-    vorbis_analysis(&(self->vb), NULL);
-    vorbis_bitrate_addblock(&(self->vb));
-
-    __vorbis_process_flush(self);
-    return 0;
+    return COOLMIC_ERROR_NONE;
 }
 
 static int __need_new_page(coolmic_enc_t *self)
@@ -218,7 +76,7 @@ static int __need_new_page(coolmic_enc_t *self)
         pageout = ogg_stream_flush;
 
     if (self->state == STATE_NEED_INIT)
-        __vorbis_start_encoder(self);
+        __start(self);
 
     if (self->state == STATE_EOF && ogg_page_eos(&(self->og)))
         return -2; /* EOF */
@@ -232,12 +90,12 @@ static int __need_new_page(coolmic_enc_t *self)
         pageout = ogg_stream_pageout;
 
         if (self->state == STATE_NEED_RESET) {
-            __vorbis_stop_encoder(self);
-            __vorbis_start_encoder(self);
+            __stop(self);
+            __start(self);
             return -2;
         }
 
-        ret = __vorbis_process(self);
+        ret = self->cb.process(self);
         if (ret == -1) {
             self->offset_in_page = -1;
             return -1;
@@ -315,6 +173,7 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->rate = rate;
     ret->channels = channels;
     ret->quality  = 0.1;
+    ret->cb = __coolmic_enc_cb_vorbis;
 
     coolmic_enc_ref(ret);
     ret->out = coolmic_iohandle_new(ret, (int (*)(void*))coolmic_enc_unref, __read, __eof);
@@ -338,7 +197,7 @@ int                 coolmic_enc_unref(coolmic_enc_t *self)
     if (self->refc != 1) /* 1 = reference in self->out */
         return COOLMIC_ERROR_NONE;
 
-    __vorbis_stop_encoder(self);
+    __stop(self);
 
     coolmic_iohandle_unref(self->in);
     coolmic_iohandle_unref(self->out);
