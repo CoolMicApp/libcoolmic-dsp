@@ -32,6 +32,9 @@
 #include <vorbis/vorbisenc.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/metadata.h>
+#ifdef HAVE_ENC_OPUS
+#include <opus/opus.h>
+#endif
 
 typedef enum coolmic_enc_state {
     STATE_NEED_INIT = 0,
@@ -96,6 +99,12 @@ struct coolmic_enc {
             vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
             vorbis_block     vb; /* local working space for packet->PCM decode */
         } vorbis;
+#ifdef HAVE_ENC_OPUS
+        /* Opus: */
+        struct {
+            OpusEncoder   *enc;
+        } opus;
+#endif
     } codec;
 
     float quality;       /* quality level, -0.1 to 1.0 */
