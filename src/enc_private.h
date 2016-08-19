@@ -59,6 +59,12 @@ typedef struct coolmic_enc_cb {
     int (*process)(coolmic_enc_t *self);
 } coolmic_enc_cb_t;
 
+typedef enum coolmic_enc_opus_state {
+    COOLMIC_ENC_OPUS_STATE_HEAD,
+    COOLMIC_ENC_OPUS_STATE_TAGS,
+    COOLMIC_ENC_OPUS_STATE_DATA
+} coolmic_enc_opus_state_t;
+
 struct coolmic_enc {
     size_t refc;
 
@@ -103,6 +109,11 @@ struct coolmic_enc {
         /* Opus: */
         struct {
             OpusEncoder   *enc;
+            coolmic_enc_opus_state_t state;
+            ogg_int64_t granulepos;
+            ogg_int64_t packetno;
+            size_t buffer_fill;
+            char buffer[2880*2*2];
         } opus;
 #endif
     } codec;
