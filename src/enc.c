@@ -159,13 +159,21 @@ static int __eof(void *userdata)
 coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsigned int channels)
 {
     coolmic_enc_t *ret;
+    coolmic_enc_cb_t cb;
 
     if (!rate || !channels)
         return NULL;
 
-    /* for now we only support Ogg/Vorbis */
-    if (strcasecmp(codec, COOLMIC_DSP_CODEC_VORBIS) != 0)
+    if (strcasecmp(codec, COOLMIC_DSP_CODEC_VORBIS) == 0) {
+        cb = __coolmic_enc_cb_vorbis;
+#ifdef HAVE_ENC_OPUS
+    } else if (strcasecmp(codec, COOLMIC_DSP_CODEC_OPUS) == 0) {
+        cb = __coolmic_enc_cb_opus;
+#endif
+    } else {
+        /* unknown codec */
         return NULL;
+    }
 
     ret = calloc(1, sizeof(coolmic_enc_t));
     if (!ret)
@@ -176,7 +184,7 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->rate = rate;
     ret->channels = channels;
     ret->quality  = 0.1;
-    ret->cb = __coolmic_enc_cb_vorbis;
+    ret->cb = cb;
 
     coolmic_enc_ref(ret);
     ret->out = coolmic_iohandle_new(ret, (int (*)(void*))coolmic_enc_unref, __read, __eof);

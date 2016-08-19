@@ -113,5 +113,6 @@ struct coolmic_enc {
 };
 
 const coolmic_enc_cb_t __coolmic_enc_cb_vorbis;
+const coolmic_enc_cb_t __coolmic_enc_cb_opus;
 
 #endif
