@@ -34,12 +34,13 @@
 
 static int __start(coolmic_enc_t *self)
 {
+    static int count;
     int ret;
 
     if (self->state != STATE_NEED_INIT)
         return -1;
 
-    srand(time(NULL)); /* TODO FIXME: move this out */
+    srand(time(NULL) + count++); /* TODO FIXME: move this out */
     ogg_stream_init(&(self->os), rand());
 
     ret = self->cb.start(self);
