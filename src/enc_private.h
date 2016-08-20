@@ -62,7 +62,8 @@ typedef struct coolmic_enc_cb {
 typedef enum coolmic_enc_opus_state {
     COOLMIC_ENC_OPUS_STATE_HEAD,
     COOLMIC_ENC_OPUS_STATE_TAGS,
-    COOLMIC_ENC_OPUS_STATE_DATA
+    COOLMIC_ENC_OPUS_STATE_DATA,
+    COOLMIC_ENC_OPUS_STATE_EOF
 } coolmic_enc_opus_state_t;
 
 struct coolmic_enc {

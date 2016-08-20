@@ -242,9 +242,15 @@ static int __opus_packetin_data(coolmic_enc_t *self)
     self->op.packet = buffer;
     self->op.bytes = len;
     self->op.b_o_s = 0;
-    self->op.e_o_s = (self->state == STATE_EOF) ? 1 : 0;
+    self->op.e_o_s = 0;
     self->op.granulepos = self->codec.opus.granulepos;
     self->op.packetno = self->codec.opus.packetno++;
+
+    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART) {
+        self->op.e_o_s = 1;
+        self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_EOF;
+        self->use_page_flush = 1;
+    }
 
     ogg_stream_packetin(&(self->os), &(self->op));
 
@@ -300,6 +306,9 @@ static int __opus_process(coolmic_enc_t *self)
         case COOLMIC_ENC_OPUS_STATE_DATA:
             if ((err =__opus_packetin_data(self)) != COOLMIC_ERROR_NONE)
                 return err;
+        break;
+        case COOLMIC_ENC_OPUS_STATE_EOF:
+            return 0;
         break;
     }
     return COOLMIC_ERROR_INVAL;
