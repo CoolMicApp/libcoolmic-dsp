@@ -103,6 +103,8 @@ static int __need_new_page(coolmic_enc_t *self)
         } else if (ret == -2) {
             return -1;
         }
+        if (self->use_page_flush)
+            pageout = ogg_stream_flush;
     }
 
     self->offset_in_page = 0;
