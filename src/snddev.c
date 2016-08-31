@@ -43,6 +43,7 @@
 
 /* forward decleration of drivers */
 int coolmic_snddev_driver_null_open(coolmic_snddev_driver_t *dev, const char *driver, void *device, uint_least32_t rate, unsigned int channels, int flags, ssize_t buffer);
+int coolmic_snddev_driver_sine_open(coolmic_snddev_driver_t *dev, const char *driver, void *device, uint_least32_t rate, unsigned int channels, int flags, ssize_t buffer);
 #ifdef HAVE_SNDDRV_DRIVER_OSS
 int coolmic_snddev_driver_oss_open(coolmic_snddev_driver_t *dev, const char *driver, void *device, uint_least32_t rate, unsigned int channels, int flags, ssize_t buffer);
 #endif
@@ -88,6 +89,8 @@ coolmic_snddev_t   *coolmic_snddev_new(const char *driver, void *device, uint_le
 
     if (strcasecmp(driver, COOLMIC_DSP_SNDDEV_DRIVER_NULL) == 0) {
         driver_open = coolmic_snddev_driver_null_open;
+    } else if (strcasecmp(driver, COOLMIC_DSP_SNDDEV_DRIVER_SINE) == 0) {
+        driver_open = coolmic_snddev_driver_sine_open;
 #ifdef HAVE_SNDDRV_DRIVER_OSS
     } else if (strcasecmp(driver, COOLMIC_DSP_SNDDEV_DRIVER_OSS) == 0) {
         driver_open = coolmic_snddev_driver_oss_open;
