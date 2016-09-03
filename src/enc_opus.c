@@ -257,6 +257,50 @@ static int __opus_packetin_data(coolmic_enc_t *self)
     return COOLMIC_ERROR_NONE;
 }
 
+static long int __opus_get_bitrate(coolmic_enc_t *self)
+{
+    register float q = self->quality;
+
+    if (q < -.15) {
+        return 32000;
+    } else if (q < -.05) {
+        return 45000;
+    } else if (q < .05) {
+        return 64000;
+    } else if (q < .15) {
+        return 80000;
+    } else if (q < .25) {
+        return 96000;
+    } else if (q < .35) {
+        return 112000;
+    } else if (q < .45) {
+        return 128000;
+    } else if (q < .55) {
+        return 160000;
+    } else if (q < .65) {
+        return 192000;
+    } else if (q < .75) {
+        return 224000;
+    } else if (q < .85) {
+        return 256000;
+    } else if (q < .95) {
+        return 320000;
+    } else if (q < 1.05) {
+        return 500000;
+    } else {
+        return 512000;
+    }
+}
+
+static int __opus_stop_encoder(coolmic_enc_t *self)
+{
+    if (self->codec.opus.enc) {
+        opus_encoder_destroy(self->codec.opus.enc);
+        self->codec.opus.enc = NULL;
+    }
+    return COOLMIC_ERROR_NONE;
+}
+
 static int __opus_start_encoder(coolmic_enc_t *self)
 {
     int error;
@@ -272,19 +316,16 @@ static int __opus_start_encoder(coolmic_enc_t *self)
         return libopuserror2error(error);
     }
 
+    error = opus_encoder_ctl(self->codec.opus.enc, OPUS_SET_BITRATE(__opus_get_bitrate(self)));
+    if (error != OPUS_OK) {
+        __opus_stop_encoder(self);
+        return libopuserror2error(error);
+    }
+
     self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_HEAD;
     self->codec.opus.granulepos = 0;
     self->codec.opus.packetno = 0;
 
-    return COOLMIC_ERROR_NONE;
-}
-
-static int __opus_stop_encoder(coolmic_enc_t *self)
-{
-    if (self->codec.opus.enc) {
-        opus_encoder_destroy(self->codec.opus.enc);
-        self->codec.opus.enc = NULL;
-    }
     return COOLMIC_ERROR_NONE;
 }
 
