@@ -257,7 +257,7 @@ int                      coolmic_metadata_tag_set(coolmic_metadata_t *self, cons
 
     __clear_tag_values(tag);
     ret = __add_tag_value(tag, value);
-    pthread_mutex_lock(&(self->lock));
+    pthread_mutex_unlock(&(self->lock));
     return ret;
 }
 
