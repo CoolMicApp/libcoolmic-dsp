@@ -345,8 +345,10 @@ coolmic_metadata_tag_t  *coolmic_metadata_iter_next_tag(coolmic_metadata_t *self
         return NULL;
 
     for (; self->iter_tag < self->tags_len; self->iter_tag++) {
-        if (self->tags[self->iter_tag].key)
+        if (self->tags[self->iter_tag].key) {
+            self->tags[self->iter_tag].iter_value = 0;
             return &(self->tags[self->iter_tag++]);
+        }
     }
 
     return NULL;
