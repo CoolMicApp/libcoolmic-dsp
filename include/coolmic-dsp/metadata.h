@@ -74,6 +74,8 @@ int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata
 int                      coolmic_metadata_iter_start(coolmic_metadata_t *self);
 /* End iteration mode. */
 int                      coolmic_metadata_iter_end(coolmic_metadata_t *self);
+/* Rewind in iteration mode. */
+int                      coolmic_metadata_iter_rewind(coolmic_metadata_t *self);
 /* Get next tag from the object.
  * Will return NULL at end of list.
  */

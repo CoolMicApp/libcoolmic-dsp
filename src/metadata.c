@@ -331,6 +331,14 @@ int                      coolmic_metadata_iter_end(coolmic_metadata_t *self)
     return COOLMIC_ERROR_NONE;
 }
 
+int                      coolmic_metadata_iter_rewind(coolmic_metadata_t *self)
+{
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+    self->iter_tag = 0;
+    return COOLMIC_ERROR_NONE;
+}
+
 coolmic_metadata_tag_t  *coolmic_metadata_iter_next_tag(coolmic_metadata_t *self)
 {
     if (!self)
