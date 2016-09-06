@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/enc.h>
+#include <coolmic-dsp/metadata.h>
 #include "enc_private.h"
 
 static int libopuserror2error(const int err) {
@@ -134,17 +135,38 @@ static int __opus_build_tags(coolmic_enc_t *self, void **buffer, size_t *len)
 {
     static const char vendor[] = "libcoolmic-dsp";
     const size_t vendor_len = strlen(vendor);
+    coolmic_metadata_t *metadata = self->metadata;
+    coolmic_metadata_tag_t *tag;
+    const char *key, *value;
     size_t retlen = 12;
     size_t tags = 0;
     void *buf;
+    int ret;
 
     retlen += vendor_len + 4;
 
+    if (metadata) {
+        ret = coolmic_metadata_iter_start(metadata);
+        if (ret != COOLMIC_ERROR_NONE)
+            return ret;
+    }
+
     _add_length("ENCODER", "libcoolmic-dsp");
 
+    while ((tag = coolmic_metadata_iter_next_tag(metadata))) {
+        key = coolmic_metadata_iter_tag_key(tag);
+        while ((value = coolmic_metadata_iter_tag_next_value(tag))) {
+            _add_length(key, value);
+        }
+    }
+    coolmic_metadata_iter_rewind(metadata);
+
     buf = malloc(retlen);
-    if (!buf)
+    if (!buf) {
+        if (metadata)
+            coolmic_metadata_iter_end(metadata);
         return COOLMIC_ERROR_NOMEM;
+    }
     *buffer = buf;
     *len = retlen;
 
@@ -160,6 +182,15 @@ static int __opus_build_tags(coolmic_enc_t *self, void **buffer, size_t *len)
     buf += 4;
 
     buf = __opus_write_tag(buf, "ENCODER", "libcoolmic-dsp");
+
+    while ((tag = coolmic_metadata_iter_next_tag(metadata))) {
+        key = coolmic_metadata_iter_tag_key(tag);
+        while ((value = coolmic_metadata_iter_tag_next_value(tag))) {
+            buf = __opus_write_tag(buf, key, value);
+        }
+    }
+
+    coolmic_metadata_iter_end(metadata);
     return COOLMIC_ERROR_NONE;
 }
 
