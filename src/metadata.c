@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <pthread.h>
 #include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
@@ -41,6 +42,9 @@ struct coolmic_metadata_tag {
 struct coolmic_metadata {
     /* reference counter */
     size_t refc;
+
+    /* object lock */
+    pthread_mutex_t lock;
 
     /* Storage for tags */
     coolmic_metadata_tag_t *tags;
@@ -169,6 +173,7 @@ coolmic_metadata_t      *coolmic_metadata_new(void)
         return NULL;
 
     ret->refc = 1;
+    pthread_mutex_init(&(ret->lock), NULL);
 
     return ret;
 }
@@ -177,7 +182,9 @@ int                 coolmic_metadata_ref(coolmic_metadata_t *self)
 {
     if (!self)
         return COOLMIC_ERROR_FAULT;
+    pthread_mutex_lock(&(self->lock));
     self->refc++;
+    pthread_mutex_unlock(&(self->lock));
     return COOLMIC_ERROR_NONE;
 }
 
@@ -188,10 +195,13 @@ int                 coolmic_metadata_unref(coolmic_metadata_t *self)
     if (!self)
         return COOLMIC_ERROR_FAULT;
 
+    pthread_mutex_lock(&(self->lock));
     self->refc--;
 
-    if (self->refc)
+    if (self->refc) {
+        pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NONE;
+    }
 
     if (self->tags) {
         for (i = 0; i < self->tags_len; i++) {
@@ -203,6 +213,8 @@ int                 coolmic_metadata_unref(coolmic_metadata_t *self)
         free(self->tags);
     }
 
+    pthread_mutex_unlock(&(self->lock));
+    pthread_mutex_destroy(&(self->lock));
     free(self);
 
     return COOLMIC_ERROR_NONE;
@@ -211,30 +223,42 @@ int                 coolmic_metadata_unref(coolmic_metadata_t *self)
 int                      coolmic_metadata_tag_add(coolmic_metadata_t *self, const char *key, const char *value)
 {
     coolmic_metadata_tag_t *tag;
+    int ret;
 
     if (!self || !key || !value)
         return COOLMIC_ERROR_FAULT;
 
+    pthread_mutex_lock(&(self->lock));
     tag = __add_tag(self, key);
-    if (!tag)
+    if (!tag) {
+        pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NOMEM;
+    }
 
-    return __add_tag_value(tag, value);
+    ret = __add_tag_value(tag, value);
+    pthread_mutex_unlock(&(self->lock));
+    return ret;
 }
 
 int                      coolmic_metadata_tag_set(coolmic_metadata_t *self, const char *key, const char *value)
 {
     coolmic_metadata_tag_t *tag;
+    int ret;
 
     if (!self || !key || !value)
         return COOLMIC_ERROR_FAULT;
 
+    pthread_mutex_lock(&(self->lock));
     tag = __add_tag(self, key);
-    if (!tag)
+    if (!tag) {
+        pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NOMEM;
+    }
 
     __clear_tag_values(tag);
-    return __add_tag_value(tag, value);
+    ret = __add_tag_value(tag, value);
+    pthread_mutex_lock(&(self->lock));
+    return ret;
 }
 
 int                      coolmic_metadata_tag_remove(coolmic_metadata_t *self, const char *key)
@@ -247,12 +271,15 @@ int                      coolmic_metadata_tag_remove(coolmic_metadata_t *self, c
     if (!self->tags)
         return COOLMIC_ERROR_INVAL;
 
+    pthread_mutex_lock(&(self->lock));
     for (i = 0; i < self->tags_len; i++) {
         if (strcasecmp(self->tags[i].key, key) == 0) {
             __clear_tag_values(&(self->tags[i]));
+            pthread_mutex_unlock(&(self->lock));
             return COOLMIC_ERROR_NONE;
         }
     }
+    pthread_mutex_unlock(&(self->lock));
 
     return COOLMIC_ERROR_NONE;
 }
@@ -268,6 +295,7 @@ int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata
     if (!self->tags)
         return COOLMIC_ERROR_INVAL;
 
+    pthread_mutex_lock(&(self->lock));
     for (i = 0; i < self->tags_len; i++) {
         tag = &(self->tags[i]);
 
@@ -281,6 +309,7 @@ int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata
             vorbis_comment_add_tag(vc, tag->key, tag->values[j]);
         }
     }
+    pthread_mutex_unlock(&(self->lock));
 
     return COOLMIC_ERROR_NONE;
 }
@@ -289,6 +318,7 @@ int                      coolmic_metadata_iter_start(coolmic_metadata_t *self)
 {
     if (!self)
         return COOLMIC_ERROR_FAULT;
+    pthread_mutex_lock(&(self->lock));
     self->iter_tag = 0;
     return COOLMIC_ERROR_NONE;
 }
@@ -297,6 +327,7 @@ int                      coolmic_metadata_iter_end(coolmic_metadata_t *self)
 {
     if (!self)
         return COOLMIC_ERROR_FAULT;
+    pthread_mutex_unlock(&(self->lock));
     return COOLMIC_ERROR_NONE;
 }
 

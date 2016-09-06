@@ -34,6 +34,12 @@
 typedef struct coolmic_metadata coolmic_metadata_t;
 typedef struct coolmic_metadata_tag coolmic_metadata_tag_t;
 
+/* Thread safety:
+ * This API is thread safe.
+ * However all calls between coolmic_metadata_iter_start() and coolmic_metadata_iter_end()
+ * must be called by the same thread. See below for iterator workflow details.
+ */
+
 /* Management of the metadata object */
 coolmic_metadata_t      *coolmic_metadata_new(void);
 int                      coolmic_metadata_ref(coolmic_metadata_t *self);
@@ -61,6 +67,7 @@ int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata
  * When you're done you need to call coolmic_metadata_iter_end().
  * Between your calls to coolmic_metadata_iter_start() and coolmic_metadata_iter_end()
  * you must not call any functions on the same object but coolmic_metadata_iter_*().
+ * While iteration all calls must be made within the same thread.
  */
 
 /* Start iteration mode. */
