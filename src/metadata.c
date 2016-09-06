@@ -26,27 +26,34 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <pthread.h>
 #include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
 #define TAG_SLOT_INCREMENT 8 /* how many tag slots to add when in need for a new one. */
 
-struct tag {
+struct coolmic_metadata_tag {
     char *key;
     size_t values_len;
     char **values;
+    size_t iter_value;
 };
 
 struct coolmic_metadata {
     /* reference counter */
     size_t refc;
 
+    /* object lock */
+    pthread_mutex_t lock;
+
     /* Storage for tags */
-    struct tag *tags;
+    coolmic_metadata_tag_t *tags;
     size_t tags_len;
+
+    size_t iter_tag;
 };
 
-static void __clear_tag_values(struct tag *tag)
+static void __clear_tag_values(coolmic_metadata_tag_t *tag)
 {
     size_t i;
 
@@ -54,7 +61,7 @@ static void __clear_tag_values(struct tag *tag)
         return;
 
     for (i = 0; i < tag->values_len; i++) {
-        if (!tag->values[i]) {
+        if (tag->values[i]) {
             free(tag->values[i]);
         }
     }
@@ -62,15 +69,21 @@ static void __clear_tag_values(struct tag *tag)
     memset(tag->values, 0, sizeof(tag->values[0])*tag->values_len);
 }
 
-static void __delete_tag(struct tag *tag)
+static void __delete_tag(coolmic_metadata_tag_t *tag)
 {
     if (tag->key)
         free(tag->key);
+    tag->key = NULL;
 
     __clear_tag_values(tag);
+
+    if (tag->values) {
+        free(tag->values);
+        tag->values_len = 0;
+    }
 }
 
-static int __add_tag_value (struct tag *tag, const char *value)
+static int __add_tag_value (coolmic_metadata_tag_t *tag, const char *value)
 {
     size_t i;
     char **values_new;
@@ -105,10 +118,10 @@ static int __add_tag_value (struct tag *tag, const char *value)
     return COOLMIC_ERROR_NONE;
 }
 
-static struct tag * __add_tag(coolmic_metadata_t *self, const char *key)
+static coolmic_metadata_tag_t * __add_tag(coolmic_metadata_t *self, const char *key)
 {
-    struct tag *tag;
-    struct tag *tags_new;
+    coolmic_metadata_tag_t *tag;
+    coolmic_metadata_tag_t *tags_new;
     size_t i;
 
     /* First look if we have a free tag-slot. */
@@ -133,12 +146,12 @@ static struct tag * __add_tag(coolmic_metadata_t *self, const char *key)
     }
 
     /* Ok, we don't have a free tag-slot, make one. */
-    tags_new = realloc(self->tags, sizeof(struct tag)*(self->tags_len + TAG_SLOT_INCREMENT));
+    tags_new = realloc(self->tags, sizeof(coolmic_metadata_tag_t)*(self->tags_len + TAG_SLOT_INCREMENT));
     if (!tags_new) /* memory allocation problem */
         return NULL;
 
-    tag = tags_new + sizeof(struct tag)*self->tags_len; /* find first new slot */
-    memset(tag, 0, sizeof(struct tag)*TAG_SLOT_INCREMENT);
+    tag = tags_new + sizeof(coolmic_metadata_tag_t)*self->tags_len; /* find first new slot */
+    memset(tag, 0, sizeof(coolmic_metadata_tag_t)*TAG_SLOT_INCREMENT);
 
     self->tags = tags_new;
     self->tags_len += TAG_SLOT_INCREMENT;
@@ -160,6 +173,7 @@ coolmic_metadata_t      *coolmic_metadata_new(void)
         return NULL;
 
     ret->refc = 1;
+    pthread_mutex_init(&(ret->lock), NULL);
 
     return ret;
 }
@@ -168,7 +182,9 @@ int                 coolmic_metadata_ref(coolmic_metadata_t *self)
 {
     if (!self)
         return COOLMIC_ERROR_FAULT;
+    pthread_mutex_lock(&(self->lock));
     self->refc++;
+    pthread_mutex_unlock(&(self->lock));
     return COOLMIC_ERROR_NONE;
 }
 
@@ -178,10 +194,14 @@ int                 coolmic_metadata_unref(coolmic_metadata_t *self)
 
     if (!self)
         return COOLMIC_ERROR_FAULT;
+
+    pthread_mutex_lock(&(self->lock));
     self->refc--;
 
-    if (self->refc)
+    if (self->refc) {
+        pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NONE;
+    }
 
     if (self->tags) {
         for (i = 0; i < self->tags_len; i++) {
@@ -193,6 +213,8 @@ int                 coolmic_metadata_unref(coolmic_metadata_t *self)
         free(self->tags);
     }
 
+    pthread_mutex_unlock(&(self->lock));
+    pthread_mutex_destroy(&(self->lock));
     free(self);
 
     return COOLMIC_ERROR_NONE;
@@ -200,31 +222,43 @@ int                 coolmic_metadata_unref(coolmic_metadata_t *self)
 
 int                      coolmic_metadata_tag_add(coolmic_metadata_t *self, const char *key, const char *value)
 {
-    struct tag *tag;
+    coolmic_metadata_tag_t *tag;
+    int ret;
 
     if (!self || !key || !value)
         return COOLMIC_ERROR_FAULT;
 
+    pthread_mutex_lock(&(self->lock));
     tag = __add_tag(self, key);
-    if (!tag)
+    if (!tag) {
+        pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NOMEM;
+    }
 
-    return __add_tag_value(tag, value);
+    ret = __add_tag_value(tag, value);
+    pthread_mutex_unlock(&(self->lock));
+    return ret;
 }
 
 int                      coolmic_metadata_tag_set(coolmic_metadata_t *self, const char *key, const char *value)
 {
-    struct tag *tag;
+    coolmic_metadata_tag_t *tag;
+    int ret;
 
     if (!self || !key || !value)
         return COOLMIC_ERROR_FAULT;
 
+    pthread_mutex_lock(&(self->lock));
     tag = __add_tag(self, key);
-    if (!tag)
+    if (!tag) {
+        pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NOMEM;
+    }
 
     __clear_tag_values(tag);
-    return __add_tag_value(tag, value);
+    ret = __add_tag_value(tag, value);
+    pthread_mutex_unlock(&(self->lock));
+    return ret;
 }
 
 int                      coolmic_metadata_tag_remove(coolmic_metadata_t *self, const char *key)
@@ -237,12 +271,15 @@ int                      coolmic_metadata_tag_remove(coolmic_metadata_t *self, c
     if (!self->tags)
         return COOLMIC_ERROR_INVAL;
 
+    pthread_mutex_lock(&(self->lock));
     for (i = 0; i < self->tags_len; i++) {
         if (strcasecmp(self->tags[i].key, key) == 0) {
             __clear_tag_values(&(self->tags[i]));
+            pthread_mutex_unlock(&(self->lock));
             return COOLMIC_ERROR_NONE;
         }
     }
+    pthread_mutex_unlock(&(self->lock));
 
     return COOLMIC_ERROR_NONE;
 }
@@ -250,7 +287,7 @@ int                      coolmic_metadata_tag_remove(coolmic_metadata_t *self, c
 int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata_t *self, vorbis_comment *vc)
 {
     size_t i, j;
-    struct tag *tag;
+    coolmic_metadata_tag_t *tag;
 
     if (!self || !vc)
         return COOLMIC_ERROR_FAULT;
@@ -258,6 +295,7 @@ int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata
     if (!self->tags)
         return COOLMIC_ERROR_INVAL;
 
+    pthread_mutex_lock(&(self->lock));
     for (i = 0; i < self->tags_len; i++) {
         tag = &(self->tags[i]);
 
@@ -271,6 +309,66 @@ int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata
             vorbis_comment_add_tag(vc, tag->key, tag->values[j]);
         }
     }
+    pthread_mutex_unlock(&(self->lock));
 
     return COOLMIC_ERROR_NONE;
+}
+
+int                      coolmic_metadata_iter_start(coolmic_metadata_t *self)
+{
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+    pthread_mutex_lock(&(self->lock));
+    self->iter_tag = 0;
+    return COOLMIC_ERROR_NONE;
+}
+
+int                      coolmic_metadata_iter_end(coolmic_metadata_t *self)
+{
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+    pthread_mutex_unlock(&(self->lock));
+    return COOLMIC_ERROR_NONE;
+}
+
+int                      coolmic_metadata_iter_rewind(coolmic_metadata_t *self)
+{
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+    self->iter_tag = 0;
+    return COOLMIC_ERROR_NONE;
+}
+
+coolmic_metadata_tag_t  *coolmic_metadata_iter_next_tag(coolmic_metadata_t *self)
+{
+    if (!self)
+        return NULL;
+
+    for (; self->iter_tag < self->tags_len; self->iter_tag++) {
+        if (self->tags[self->iter_tag].key) {
+            self->tags[self->iter_tag].iter_value = 0;
+            return &(self->tags[self->iter_tag++]);
+        }
+    }
+
+    return NULL;
+}
+
+const char              *coolmic_metadata_iter_tag_key(coolmic_metadata_tag_t *tag)
+{
+    if (!tag)
+        return NULL;
+    return tag->key;
+}
+
+const char              *coolmic_metadata_iter_tag_next_value(coolmic_metadata_tag_t *tag)
+{
+    if (!tag)
+        return NULL;
+
+    for (; tag->iter_value < tag->values_len; tag->iter_value++) {
+        if (tag->values[tag->iter_value])
+            return tag->values[tag->iter_value++];
+    }
+    return NULL;
 }

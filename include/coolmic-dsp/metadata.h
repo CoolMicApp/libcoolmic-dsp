@@ -32,6 +32,13 @@
 #include <vorbis/codec.h>
 
 typedef struct coolmic_metadata coolmic_metadata_t;
+typedef struct coolmic_metadata_tag coolmic_metadata_tag_t;
+
+/* Thread safety:
+ * This API is thread safe.
+ * However all calls between coolmic_metadata_iter_start() and coolmic_metadata_iter_end()
+ * must be called by the same thread. See below for iterator workflow details.
+ */
 
 /* Management of the metadata object */
 coolmic_metadata_t      *coolmic_metadata_new(void);
@@ -53,5 +60,32 @@ int                      coolmic_metadata_tag_remove(coolmic_metadata_t *self, c
  * instance of vc will add the tags multiple times.
  */
 int                      coolmic_metadata_add_to_vorbis_comment(coolmic_metadata_t *self, vorbis_comment *vc);
+
+
+/* This is the iterate API. It allows you to read the content of the metadata object.
+ * Every time you want to iterate you need to start with coolmic_metadata_iter_start().
+ * When you're done you need to call coolmic_metadata_iter_end().
+ * Between your calls to coolmic_metadata_iter_start() and coolmic_metadata_iter_end()
+ * you must not call any functions on the same object but coolmic_metadata_iter_*().
+ * While iteration all calls must be made within the same thread.
+ */
+
+/* Start iteration mode. */
+int                      coolmic_metadata_iter_start(coolmic_metadata_t *self);
+/* End iteration mode. */
+int                      coolmic_metadata_iter_end(coolmic_metadata_t *self);
+/* Rewind in iteration mode. */
+int                      coolmic_metadata_iter_rewind(coolmic_metadata_t *self);
+/* Get next tag from the object.
+ * Will return NULL at end of list.
+ */
+coolmic_metadata_tag_t  *coolmic_metadata_iter_next_tag(coolmic_metadata_t *self);
+/* Returns the key or name from the tag. */
+const char              *coolmic_metadata_iter_tag_key(coolmic_metadata_tag_t *tag);
+/* Returns the next value for the current tag.
+ * Will return NULL at end of list.
+ * Note: It's possible that this will return NULL at first call if there are no values for the given tag.
+ */
+const char              *coolmic_metadata_iter_tag_next_value(coolmic_metadata_tag_t *tag);
 
 #endif
