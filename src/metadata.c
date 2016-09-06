@@ -54,7 +54,7 @@ static void __clear_tag_values(struct tag *tag)
         return;
 
     for (i = 0; i < tag->values_len; i++) {
-        if (!tag->values[i]) {
+        if (tag->values[i]) {
             free(tag->values[i]);
         }
     }
@@ -66,8 +66,14 @@ static void __delete_tag(struct tag *tag)
 {
     if (tag->key)
         free(tag->key);
+    tag->key = NULL;
 
     __clear_tag_values(tag);
+
+    if (tag->values) {
+        free(tag->values);
+        tag->values_len = 0;
+    }
 }
 
 static int __add_tag_value (struct tag *tag, const char *value)
