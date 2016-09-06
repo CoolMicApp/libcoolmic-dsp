@@ -184,6 +184,7 @@ int                 coolmic_metadata_unref(coolmic_metadata_t *self)
 
     if (!self)
         return COOLMIC_ERROR_FAULT;
+
     self->refc--;
 
     if (self->refc)
