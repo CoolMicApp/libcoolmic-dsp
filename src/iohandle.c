@@ -86,11 +86,34 @@ int                 coolmic_iohandle_unref(coolmic_iohandle_t *self)
 
 ssize_t             coolmic_iohandle_read(coolmic_iohandle_t *self, void *buffer, size_t len)
 {
+    ssize_t done = 0;
+    ssize_t ret;
+
     if (!self || !buffer)
         return COOLMIC_ERROR_FAULT;
     if (!len)
         return COOLMIC_ERROR_NONE;
-    return self->read(self->userdata, buffer, len);
+    if (!self->read)
+        return COOLMIC_ERROR_NOSYS;
+
+    while (len) {
+        ret = self->read(self->userdata, buffer, len);
+        if (ret < 0) {
+            if (done) {
+                return done;
+            } else {
+                return ret;
+            }
+        } else if (ret == 0) {
+            return done;
+        }
+
+        buffer += ret;
+        len    -= ret;
+        done   += ret;
+    }
+
+    return done;
 }
 
 int                 coolmic_iohandle_eof(coolmic_iohandle_t *self)
