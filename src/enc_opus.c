@@ -260,7 +260,7 @@ static int __opus_packetin_data(coolmic_enc_t *self)
     unsigned char buffer[4096];
 
     if (!data)
-        return COOLMIC_ERROR_GENERIC;
+        return COOLMIC_ERROR_NONE;
 
     len = opus_encode(self->codec.opus.enc, data, frames, buffer, sizeof(buffer));
 
