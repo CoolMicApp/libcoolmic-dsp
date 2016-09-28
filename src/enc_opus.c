@@ -389,21 +389,21 @@ static int __opus_process(coolmic_enc_t *self)
         case COOLMIC_ENC_OPUS_STATE_HEAD:
             if ((err = __opus_packetin_header(self)) != COOLMIC_ERROR_NONE) {
                 coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: can not create header");
-                return err;
+                return -1;
             }
             self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_TAGS;
         break;
         case COOLMIC_ENC_OPUS_STATE_TAGS:
             if ((err = __opus_packetin_tags(self)) != COOLMIC_ERROR_NONE) {
                 coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: can not create tags");
-                return err;
+                return -1;
             }
             self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_DATA;
         break;
         case COOLMIC_ENC_OPUS_STATE_DATA:
             if ((err = __opus_packetin_data(self)) != COOLMIC_ERROR_NONE) {
                 coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: can not process data");
-                return err;
+                return -1;
             }
             coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Process successful");
             return 0;
@@ -416,7 +416,7 @@ static int __opus_process(coolmic_enc_t *self)
 
     err = COOLMIC_ERROR_INVAL;
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: invalid state");
-    return err;
+    return -1;
 }
 
 const coolmic_enc_cb_t __coolmic_enc_cb_opus = {
