@@ -326,38 +326,56 @@ static long int __opus_get_bitrate(coolmic_enc_t *self)
 
 static int __opus_stop_encoder(coolmic_enc_t *self)
 {
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stop callback called");
+
     if (self->codec.opus.enc) {
         opus_encoder_destroy(self->codec.opus.enc);
         self->codec.opus.enc = NULL;
     }
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stop successful");
     return COOLMIC_ERROR_NONE;
 }
 
 static int __opus_start_encoder(coolmic_enc_t *self)
 {
     int error;
+    int ret;
 
-    if (self->channels < 1 || self->channels > 2)
-        return COOLMIC_ERROR_INVAL;
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Start callback called");
 
-    if (self->rate != 48000)
-        return COOLMIC_ERROR_INVAL;
+    if (self->channels < 1 || self->channels > 2) {
+        ret = COOLMIC_ERROR_INVAL;
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, ret, "Start failed: bad number of channels (supported: 1, 2): %u", self->channels);
+        return ret;
+    }
+
+    if (self->rate != 48000) {
+        ret = COOLMIC_ERROR_INVAL;
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, ret, "Start failed: bad sampling rate (supported: 48000): %u", self->channels);
+        return ret;
+    }
 
     self->codec.opus.enc = opus_encoder_create(self->rate, self->channels, OPUS_APPLICATION_AUDIO, &error);
     if (!self->codec.opus.enc) {
-        return libopuserror2error(error);
+        ret = libopuserror2error(error);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, ret, "Start failed: can not create encoder");
+        return ret;
     }
 
     error = opus_encoder_ctl(self->codec.opus.enc, OPUS_SET_BITRATE(__opus_get_bitrate(self)));
     if (error != OPUS_OK) {
         __opus_stop_encoder(self);
-        return libopuserror2error(error);
+        ret = libopuserror2error(error);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, ret, "Start failed: can not set bitrate");
+        return ret;
     }
 
     self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_HEAD;
     self->codec.opus.granulepos = 0;
     self->codec.opus.packetno = 0;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Start successful");
     return COOLMIC_ERROR_NONE;
 }
 
@@ -365,26 +383,40 @@ static int __opus_process(coolmic_enc_t *self)
 {
     int err;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Process callback called");
+
     switch (self->codec.opus.state) {
         case COOLMIC_ENC_OPUS_STATE_HEAD:
-            if ((err =__opus_packetin_header(self)) != COOLMIC_ERROR_NONE)
+            if ((err = __opus_packetin_header(self)) != COOLMIC_ERROR_NONE) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: can not create header");
                 return err;
+            }
             self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_TAGS;
         break;
         case COOLMIC_ENC_OPUS_STATE_TAGS:
-            if ((err =__opus_packetin_tags(self)) != COOLMIC_ERROR_NONE)
+            if ((err = __opus_packetin_tags(self)) != COOLMIC_ERROR_NONE) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: can not create tags");
                 return err;
+            }
             self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_DATA;
         break;
         case COOLMIC_ENC_OPUS_STATE_DATA:
-            if ((err =__opus_packetin_data(self)) != COOLMIC_ERROR_NONE)
+            if ((err = __opus_packetin_data(self)) != COOLMIC_ERROR_NONE) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: can not process data");
                 return err;
+            }
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Process successful");
+            return 0;
         break;
         case COOLMIC_ENC_OPUS_STATE_EOF:
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Process successful");
             return 0;
         break;
     }
-    return COOLMIC_ERROR_INVAL;
+
+    err = COOLMIC_ERROR_INVAL;
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "Process failed: invalid state");
+    return err;
 }
 
 const coolmic_enc_cb_t __coolmic_enc_cb_opus = {
