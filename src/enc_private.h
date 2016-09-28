@@ -33,7 +33,11 @@
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/metadata.h>
 #ifdef HAVE_ENC_OPUS
+#ifdef HAVE_ENC_OPUS_BROKEN_INCLUDE_PATH
+#include <opus/include/opus.h>
+#else
 #include <opus/opus.h>
+#endif
 #endif
 
 typedef enum coolmic_enc_state {
