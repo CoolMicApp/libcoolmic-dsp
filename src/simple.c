@@ -23,6 +23,7 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/simple"
 #include <unistd.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -35,6 +36,7 @@
 #include <coolmic-dsp/vumeter.h>
 #include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/logging.h>
 
 struct coolmic_simple {
     size_t refc;
@@ -263,12 +265,15 @@ static void *__worker(void *userdata)
     }
 
     while (running == 1) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Still running");
+
         if ((error = coolmic_shout_iter(shout)) != COOLMIC_ERROR_NONE) {
             __emit_error_unlocked(self, &(self->thread), error);
             __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTIONERROR, error);
             break;
         }
         ret = coolmic_vumeter_read(vumeter, -1);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "VUmeter returned: %zi", ret);
         if (ret < 0) {
             __emit_error_unlocked(self, &(self->thread), COOLMIC_ERROR_GENERIC);
             break;

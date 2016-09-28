@@ -23,12 +23,14 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/snddev"
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <coolmic-dsp/snddev.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/logging.h>
 
 /* default driver */
 #ifndef DEFAULT_SNDDRV_DRIVER
@@ -70,6 +72,9 @@ struct coolmic_snddev {
 static ssize_t __read(void *userdata, void *buffer, size_t len)
 {
     coolmic_snddev_t *self = (coolmic_snddev_t*)userdata;
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request, buffer=%p, len=%zu", buffer, len);
+
     if (!self->driver.read)
         return COOLMIC_ERROR_NOSYS;
     return self->driver.read(&(self->driver), buffer, len);

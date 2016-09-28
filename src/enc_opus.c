@@ -227,8 +227,12 @@ static void* __opus_read_data(coolmic_enc_t *self, size_t frames)
     size_t todo;
     ssize_t ret;
 
-    if (len > sizeof(self->codec.opus.buffer))
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "New data requested, %zu frames (%zu bytes)", frames, len);
+
+    if (len > sizeof(self->codec.opus.buffer)) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_INVAL, "Request bigger than buffer");
         return NULL;
+    }
 
     if (self->codec.opus.buffer_fill == len) {
         self->codec.opus.buffer_fill = 0;
@@ -236,6 +240,7 @@ static void* __opus_read_data(coolmic_enc_t *self, size_t frames)
     } else if (self->codec.opus.buffer_fill < len) {
         todo = len - self->codec.opus.buffer_fill;
         ret = coolmic_iohandle_read(self->in, self->codec.opus.buffer + self->codec.opus.buffer_fill, todo);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Requested data: requested %zu bytes, got %zi bytes", todo, ret);
         if (ret == (ssize_t)todo) {
             self->codec.opus.buffer_fill = 0;
             return self->codec.opus.buffer;
@@ -243,12 +248,15 @@ static void* __opus_read_data(coolmic_enc_t *self, size_t frames)
             if (coolmic_iohandle_eof(self->in) == 1) {
                 self->state = STATE_EOF;
             }
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_NONE, "Can not read more data from input");
             return NULL;
         } else {
             self->codec.opus.buffer_fill += ret;
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_NONE, "Got more data but not enough to satisfy request");
             return NULL;
         }
     } else {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_INVAL, "Bad state, fill > len");
         return NULL;
     }
 }
@@ -259,14 +267,21 @@ static int __opus_packetin_data(coolmic_enc_t *self)
     void *data = __opus_read_data(self, frames);
     opus_int32 len;
     unsigned char buffer[4096];
+    int err;
 
-    if (!data)
-        return COOLMIC_ERROR_NONE;
+    if (!data) {
+        err = COOLMIC_ERROR_NONE;
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "No input data");
+        return err;
+    }
 
     len = opus_encode(self->codec.opus.enc, data, frames, buffer, sizeof(buffer));
 
-    if (len < 0)
-        return libopuserror2error(len);
+    if (len < 0) {
+        err = libopuserror2error(len);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, err, "Encoder error");
+        return err;
+    }
 
     self->codec.opus.granulepos += frames;
 
