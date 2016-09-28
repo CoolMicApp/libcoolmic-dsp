@@ -45,7 +45,8 @@ static const struct {
     {COOLMIC_ERROR_UNCONNECTED,       "Unconnected."},
     {COOLMIC_ERROR_NOTLS,             "TLS requested but not supported by peer"},
     {COOLMIC_ERROR_TLSBADCERT,        "TLS connection can not be established because of bad certificate"},
-    {COOLMIC_ERROR_BADRQC,            "Invalid request code"}
+    {COOLMIC_ERROR_BADRQC,            "Invalid request code"},
+    {COOLMIC_ERROR_RETRY,             "Retry last action"}
 };
 
 const char *coolmic_error2string(const int error) {

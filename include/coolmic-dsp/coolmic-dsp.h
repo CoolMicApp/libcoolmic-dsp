@@ -47,6 +47,7 @@
 #define COOLMIC_ERROR_NOTLS             (-17) /* TLS requested but not supported by peer */
 #define COOLMIC_ERROR_TLSBADCERT        (-18) /* TLS connection can not be established because of bad certificate */
 #define COOLMIC_ERROR_BADRQC            (-19) /* Invalid request code */
+#define COOLMIC_ERROR_RETRY             (-20) /* Retry last action */
 
 /* Features */
 #define COOLMIC_FEATURE_ENCODE_OGG_VORBIS   "encode:ogg/vorbis" /* we can encode Ogg/Vorbis */
