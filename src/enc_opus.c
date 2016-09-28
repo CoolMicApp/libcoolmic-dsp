@@ -270,7 +270,7 @@ static int __opus_packetin_data(coolmic_enc_t *self)
     int err;
 
     if (!data) {
-        err = COOLMIC_ERROR_NONE;
+        err = COOLMIC_ERROR_RETRY;
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, err, "No input data");
         return err;
     }
@@ -422,7 +422,11 @@ static int __opus_process(coolmic_enc_t *self)
         case COOLMIC_ENC_OPUS_STATE_DATA:
             if ((err = __opus_packetin_data(self)) != COOLMIC_ERROR_NONE) {
                 coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, err, "Process failed: can not process data");
-                return -1;
+                if (err == COOLMIC_ERROR_RETRY) {
+                    return -2;
+                } else {
+                    return -1;
+                }
             }
             coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Process successful");
             return 0;
