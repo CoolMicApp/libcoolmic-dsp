@@ -39,7 +39,7 @@ static int __start(coolmic_enc_t *self)
     static int count;
     int ret;
 
-    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Start request");
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Start request");
 
     if (self->state != STATE_NEED_INIT)
         return -1;
@@ -49,7 +49,7 @@ static int __start(coolmic_enc_t *self)
 
     ret = self->cb.start(self);
     if (ret != COOLMIC_ERROR_NONE) {
-        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, ret, "Start failed");
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Start failed");
         return ret;
     }
 
@@ -62,11 +62,11 @@ static int __stop(coolmic_enc_t *self)
 {
     int ret;
 
-    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stop request");
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Stop request");
 
     ret = self->cb.stop(self);
     if (ret != COOLMIC_ERROR_NONE) {
-        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, ret, "Stop failed");
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Stop failed");
         return ret;
     }
 
@@ -240,7 +240,7 @@ int                 coolmic_enc_unref(coolmic_enc_t *self)
 
 int                 coolmic_enc_reset(coolmic_enc_t *self)
 {
-    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Restart request");
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Restart request");
 
     if (!self)
         return COOLMIC_ERROR_FAULT;
@@ -263,7 +263,7 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
 
 static inline int __restart(coolmic_enc_t *self)
 {
-    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Reset request");
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Reset request");
 
     if (!self)
         return COOLMIC_ERROR_FAULT;
