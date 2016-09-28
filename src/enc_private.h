@@ -42,8 +42,17 @@ typedef enum coolmic_enc_state {
 } coolmic_enc_state_t;
 
 typedef struct coolmic_enc_cb {
+    /* Called to set up the codec specific internals.
+     * Returns a COOLMIC_ERROR_*.
+     */
     int (*start)(coolmic_enc_t *self);
+    /* Called to free the codec specific internals.
+     * Returns a COOLMIC_ERROR_*.
+     */
     int (*stop)(coolmic_enc_t *self);
+    /* Called when more data is needed from the codec.
+     * Returns: 0 on success, -1 on error and -2 on recoverable error.
+     */
     int (*process)(coolmic_enc_t *self);
 } coolmic_enc_cb_t;
 
