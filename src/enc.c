@@ -88,8 +88,14 @@ static int __need_new_page(coolmic_enc_t *self)
     if (self->use_page_flush)
         pageout = ogg_stream_flush;
 
-    if (self->state == STATE_NEED_INIT)
-        __start(self);
+    if (self->state == STATE_NEED_INIT) {
+        ret = __start(self);
+        if (ret != COOLMIC_ERROR_NONE) {
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Can not start encoder");
+            self->offset_in_page = -1;
+            return -1;
+        }
+    }
 
     if (self->state == STATE_EOF && ogg_page_eos(&(self->og))) {
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "We reached EOF");
@@ -105,8 +111,18 @@ static int __need_new_page(coolmic_enc_t *self)
         pageout = ogg_stream_pageout;
 
         if (self->state == STATE_NEED_RESET) {
-            __stop(self);
-            __start(self);
+            ret = __stop(self);
+            if (ret != COOLMIC_ERROR_NONE) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Can not stop encoder");
+                self->offset_in_page = -1;
+                return -1;
+            }
+            ret = __start(self);
+            if (ret != COOLMIC_ERROR_NONE) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Can not start encoder");
+                self->offset_in_page = -1;
+                return -1;
+            }
             return -2;
         }
 
