@@ -23,6 +23,8 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+
+#define COOLMIC_COMPONENT "libcoolmic-dsp/enc"
 #include <strings.h>
 #include <stdlib.h>
 #include <string.h>

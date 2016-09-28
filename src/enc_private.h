@@ -32,6 +32,7 @@
 #include <vorbis/vorbisenc.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/metadata.h>
+#include <coolmic-dsp/logging.h>
 #ifdef HAVE_ENC_OPUS
 #ifdef HAVE_ENC_OPUS_BROKEN_INCLUDE_PATH
 #include <opus/include/opus.h>
