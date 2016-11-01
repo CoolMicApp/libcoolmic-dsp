@@ -23,6 +23,7 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/enc-vorbis"
 #include <strings.h>
 #include <string.h>
 #include <coolmic-dsp/coolmic-dsp.h>

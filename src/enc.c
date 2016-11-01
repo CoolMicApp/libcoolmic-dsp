@@ -23,6 +23,8 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+
+#define COOLMIC_COMPONENT "libcoolmic-dsp/enc"
 #include <strings.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,6 +39,8 @@ static int __start(coolmic_enc_t *self)
     static int count;
     int ret;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Start request");
+
     if (self->state != STATE_NEED_INIT)
         return -1;
 
@@ -44,8 +48,10 @@ static int __start(coolmic_enc_t *self)
     ogg_stream_init(&(self->os), rand());
 
     ret = self->cb.start(self);
-    if (ret != COOLMIC_ERROR_NONE)
+    if (ret != COOLMIC_ERROR_NONE) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Start failed");
         return ret;
+    }
 
     self->state = STATE_RUNNING;
 
@@ -56,9 +62,13 @@ static int __stop(coolmic_enc_t *self)
 {
     int ret;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Stop request");
+
     ret = self->cb.stop(self);
-    if (ret != COOLMIC_ERROR_NONE)
+    if (ret != COOLMIC_ERROR_NONE) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Stop failed");
         return ret;
+    }
 
     ogg_stream_clear(&(self->os));
     memset(&(self->os), 0, sizeof(self->os));
@@ -73,14 +83,24 @@ static int __need_new_page(coolmic_enc_t *self)
     int ret;
     int (*pageout)(ogg_stream_state *, ogg_page *) = ogg_stream_pageout;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "New page request");
+
     if (self->use_page_flush)
         pageout = ogg_stream_flush;
 
-    if (self->state == STATE_NEED_INIT)
-        __start(self);
+    if (self->state == STATE_NEED_INIT) {
+        ret = __start(self);
+        if (ret != COOLMIC_ERROR_NONE) {
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Can not start encoder");
+            self->offset_in_page = -1;
+            return -1;
+        }
+    }
 
-    if (self->state == STATE_EOF && ogg_page_eos(&(self->og)))
+    if (self->state == STATE_EOF && ogg_page_eos(&(self->og))) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "We reached EOF");
         return -2; /* EOF */
+    }
 
     if (self->state == STATE_NEED_RESTART && ogg_page_eos(&(self->og)))
         self->state = STATE_NEED_RESET;
@@ -91,11 +111,22 @@ static int __need_new_page(coolmic_enc_t *self)
         pageout = ogg_stream_pageout;
 
         if (self->state == STATE_NEED_RESET) {
-            __stop(self);
-            __start(self);
+            ret = __stop(self);
+            if (ret != COOLMIC_ERROR_NONE) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Can not stop encoder");
+                self->offset_in_page = -1;
+                return -1;
+            }
+            ret = __start(self);
+            if (ret != COOLMIC_ERROR_NONE) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Can not start encoder");
+                self->offset_in_page = -1;
+                return -1;
+            }
             return -2;
         }
 
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "No new data in buffer, calling process callback");
         ret = self->cb.process(self);
         if (ret == -1) {
             self->offset_in_page = -1;
@@ -107,6 +138,7 @@ static int __need_new_page(coolmic_enc_t *self)
             pageout = ogg_stream_flush;
     }
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "New page request satisfied");
     self->offset_in_page = 0;
     return 0;
 }
@@ -117,6 +149,8 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
     size_t offset;
     size_t max_len;
     int ret;
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request, buffer=%p, len=%zu byte", buffer, len);
 
     if (self->offset_in_page == -1)
         return COOLMIC_ERROR_GENERIC;
@@ -143,6 +177,7 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
     len = (len > max_len) ? max_len : len;
     memcpy(buffer, self->og.body + offset, len);
     self->offset_in_page += len;
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request satisfied, returned %zu byte", len);
     return len;
 }
 
@@ -159,13 +194,22 @@ static int __eof(void *userdata)
 coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsigned int channels)
 {
     coolmic_enc_t *ret;
+    coolmic_enc_cb_t cb;
 
     if (!rate || !channels)
         return NULL;
 
-    /* for now we only support Ogg/Vorbis */
-    if (strcasecmp(codec, COOLMIC_DSP_CODEC_VORBIS) != 0)
+    if (strcasecmp(codec, COOLMIC_DSP_CODEC_VORBIS) == 0) {
+        cb = __coolmic_enc_cb_vorbis;
+#ifdef HAVE_ENC_OPUS
+    } else if (strcasecmp(codec, COOLMIC_DSP_CODEC_OPUS) == 0) {
+        cb = __coolmic_enc_cb_opus;
+#endif
+    } else {
+        /* unknown codec */
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_NOSYS, "Unknown codec: %s", codec);
         return NULL;
+    }
 
     ret = calloc(1, sizeof(coolmic_enc_t));
     if (!ret)
@@ -176,7 +220,7 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->rate = rate;
     ret->channels = channels;
     ret->quality  = 0.1;
-    ret->cb = __coolmic_enc_cb_vorbis;
+    ret->cb = cb;
 
     coolmic_enc_ref(ret);
     ret->out = coolmic_iohandle_new(ret, (int (*)(void*))coolmic_enc_unref, __read, __eof);
@@ -212,6 +256,8 @@ int                 coolmic_enc_unref(coolmic_enc_t *self)
 
 int                 coolmic_enc_reset(coolmic_enc_t *self)
 {
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Restart request");
+
     if (!self)
         return COOLMIC_ERROR_FAULT;
     if (self->state != STATE_RUNNING && self->state != STATE_EOF)
@@ -233,6 +279,8 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
 
 static inline int __restart(coolmic_enc_t *self)
 {
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Reset request");
+
     if (!self)
         return COOLMIC_ERROR_FAULT;
     if (self->state != STATE_RUNNING && self->state != STATE_EOF)

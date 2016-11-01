@@ -23,11 +23,13 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/tee"
 #include <stdlib.h>
 #include <string.h>
 #include <coolmic-dsp/tee.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/logging.h>
 
 #define MAX_READERS 4
 
@@ -87,22 +89,33 @@ static void __readjust_buffer(coolmic_tee_t *self, size_t len_request)
         len_request = 8192;
     }
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Buffer adjustment for %zu bytes", len_request);
+
     if (len_request > self->buffer_len) {
         buffer_new = realloc(self->buffer, len_request);
         if (buffer_new) {
             self->buffer = buffer_new;
             self->buffer_len = len_request;
+        } else {
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_NONE, "Can not allocate new buffer");
         }
     }
 
-    if (!self->buffer)
+    if (!self->buffer) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_NONE, "Unabled to allocate any buffer");
         return;
+    }
 
     /* look up the common (minimum) offset of all reads into the buffer */
     min_offset = self->buffer_fill;
-    for (i = 0; i < self->readers; i++)
-        if (self->offset[i] < min_offset)
+    for (i = 0; i < self->readers; i++) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Reader %zu's offset is %zu byte", i, self->offset[i]);
+        if (self->offset[i] < min_offset) {
             min_offset = self->offset[i];
+        }
+    }
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Buffer's minimum offset is %zu byte", min_offset);
 
     /* if we got a minimum offset > 0 we can move what we have to the begin of the buffer */
     if (min_offset > 0) {
@@ -119,20 +132,25 @@ static ssize_t __read_phy(coolmic_tee_t *self, size_t len_request)
     size_t iter;
     size_t ret;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Physical read request, len_request=%zu", len_request);
     __readjust_buffer(self, len_request);
 
     iter = self->buffer_len - self->buffer_fill;
 
     /* check if there is some kind of problem with the buffer */
-    if (!self->buffer || !iter)
-        return COOLMIC_ERROR_NOMEM;
+    if (!self->buffer || !iter) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_NOMEM, "Physical read failed, self->buffer=%p, iter=%zu", self->buffer, iter);
+        return -1;
+    }
 
     if (iter > len_request)
         iter = len_request;
 
     ret = coolmic_iohandle_read(self->in, self->buffer + self->buffer_fill, iter);
-    if (ret < 1)
+    if (ret < 1) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_NONE, "Physical read on backend failed");
         return ret;
+    }
 
     self->buffer_fill += ret;
 
@@ -146,11 +164,15 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
     ssize_t ret = 0;
     size_t iter;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request, buffer=%p, len=%zu", buffer, len);
+
     do {
         iter = self->buffer_fill - self->offset[backpointer->index];
         if (!iter) {
-            if (__read_phy(self, len) < 1)
+            if (__read_phy(self, len) < 1) {
+                coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request satisfied, ret=%zu", ret);
                 return ret;
+            }
             iter = self->buffer_fill - self->offset[backpointer->index];
         }
 
@@ -162,12 +184,16 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
         ret += iter;
         self->offset[backpointer->index] += iter;
 
-        if (iter == len)
+        if (iter == len) {
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request satisfied, ret=%zu", ret);
             return ret;
+        }
 
         buffer += iter;
         len -= iter;
     } while (iter);
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request satisfied, ret=%zu", ret);
 
     return ret;
 }

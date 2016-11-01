@@ -23,11 +23,13 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/tee"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <coolmic-dsp/vumeter.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/logging.h>
 
 struct coolmic_vumeter {
     /* reference counter */
@@ -126,10 +128,13 @@ static ssize_t      coolmic_vumeter_read_phy(coolmic_vumeter_t *self, ssize_t ma
 
     len = sizeof(self->buffer) - self->buffer_fill;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Physical read request, maxlen=%zi, len=%zu", maxlen, len);
+
     if (maxlen >= 0 && len > (size_t)maxlen)
         len = maxlen;
 
     ret = coolmic_iohandle_read(self->in, self->buffer + self->buffer_fill, len);
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Physical read on iohandle returned %zi bytes", ret);
 
     if (ret == -1 && !self->buffer_fill) {
         return -1;
@@ -150,10 +155,15 @@ ssize_t             coolmic_vumeter_read(coolmic_vumeter_t *self, ssize_t maxlen
     size_t f, c;
     int16_t *in;
 
-    if (!self)
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Read request, maxlen=%zi", maxlen);
+
+    if (!self) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, COOLMIC_ERROR_FAULT, "Bad state, self=NULL");
         return -1;
+    }
 
     ret = coolmic_vumeter_read_phy(self, maxlen);
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Got %zi byte", ret);
 
     in = (int16_t*)(self->buffer);
 

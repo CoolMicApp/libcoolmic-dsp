@@ -32,6 +32,14 @@
 #include <vorbis/vorbisenc.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/metadata.h>
+#include <coolmic-dsp/logging.h>
+#ifdef HAVE_ENC_OPUS
+#ifdef HAVE_ENC_OPUS_BROKEN_INCLUDE_PATH
+#include <opus/include/opus.h>
+#else
+#include <opus/opus.h>
+#endif
+#endif
 
 typedef enum coolmic_enc_state {
     STATE_NEED_INIT = 0,
@@ -55,6 +63,13 @@ typedef struct coolmic_enc_cb {
      */
     int (*process)(coolmic_enc_t *self);
 } coolmic_enc_cb_t;
+
+typedef enum coolmic_enc_opus_state {
+    COOLMIC_ENC_OPUS_STATE_HEAD,
+    COOLMIC_ENC_OPUS_STATE_TAGS,
+    COOLMIC_ENC_OPUS_STATE_DATA,
+    COOLMIC_ENC_OPUS_STATE_EOF
+} coolmic_enc_opus_state_t;
 
 struct coolmic_enc {
     size_t refc;
@@ -96,6 +111,17 @@ struct coolmic_enc {
             vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
             vorbis_block     vb; /* local working space for packet->PCM decode */
         } vorbis;
+#ifdef HAVE_ENC_OPUS
+        /* Opus: */
+        struct {
+            OpusEncoder   *enc;
+            coolmic_enc_opus_state_t state;
+            ogg_int64_t granulepos;
+            ogg_int64_t packetno;
+            size_t buffer_fill;
+            char buffer[2880*2*2];
+        } opus;
+#endif
     } codec;
 
     float quality;       /* quality level, -0.1 to 1.0 */
@@ -104,5 +130,6 @@ struct coolmic_enc {
 };
 
 const coolmic_enc_cb_t __coolmic_enc_cb_vorbis;
+const coolmic_enc_cb_t __coolmic_enc_cb_opus;
 
 #endif
