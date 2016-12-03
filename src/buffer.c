@@ -35,6 +35,9 @@ struct coolmic_buffer {
     /* buffer length */
     size_t length;
 
+    /* buffer offset */
+    size_t offset;
+
     /* buffer content */
     void *content;
 
@@ -129,14 +132,31 @@ void               *coolmic_buffer_get_content(coolmic_buffer_t *self)
 {
     if (!self)
         return NULL;
-    return self->content;
+    return self->content + self->offset;
 }
 
 ssize_t             coolmic_buffer_get_length(coolmic_buffer_t *self)
 {
     if (!self)
         return -1;
-    return self->length;
+    return self->length - self->offset;
+}
+
+int                 coolmic_buffer_set_offset(coolmic_buffer_t *self, size_t offset)
+{
+    size_t new_offset;
+
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    new_offset = self->offset + offset;
+
+    if (self->length < new_offset)
+        return COOLMIC_ERROR_INVAL;
+
+    self->offset = new_offset;
+
+    return COOLMIC_ERROR_NONE;
 }
 
 void               *coolmic_buffer_get_userdata(coolmic_buffer_t *self)

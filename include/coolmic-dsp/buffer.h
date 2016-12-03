@@ -56,6 +56,9 @@ int                 coolmic_buffer_unref(coolmic_buffer_t *self);
 void               *coolmic_buffer_get_content(coolmic_buffer_t *self);
 ssize_t             coolmic_buffer_get_length(coolmic_buffer_t *self);
 
+/* sets a static offset to the data (shrinks the buffer) */
+int                 coolmic_buffer_set_offset(coolmic_buffer_t *self, size_t offset);
+
 /* get and set userdata */
 void               *coolmic_buffer_get_userdata(coolmic_buffer_t *self);
 int                 coolmic_buffer_set_userdata(coolmic_buffer_t *self, void *userdata);
