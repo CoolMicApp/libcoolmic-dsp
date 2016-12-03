@@ -38,11 +38,11 @@ typedef struct coolmic_buffer coolmic_buffer_t;
 /* The constructor takes the length of the buffer length.
  * If take is NULL it allocates a new buffer. If take is not NULL take is used as buffer.
  * Aftr a buffer has been allocated if copy is not NULL copy is copied into the buffer.
- * When the object is destroied the buffer is freed with free if take was not NULL.
- * If free is NULL the operating system's free() is used.
+ * When the object is destroied the buffer is freed with xfree if take was not NULL.
+ * If xfree is NULL the operating system's free() is used.
  * userdata is passed to free.
  */
-coolmic_buffer_t   *coolmic_buffer_new(size_t length, const void *copy, void *take, void (*free)(void *buffer, void *userdata), void *userdata);
+coolmic_buffer_t   *coolmic_buffer_new(size_t length, const void *copy, void *take, void (*xfree)(void *content, void *userdata), void *userdata);
 /* The simple constructor takes the length for the buffer to be allocated.
  * If content is not NULL the addess of the buffer is written to *content.
  */
