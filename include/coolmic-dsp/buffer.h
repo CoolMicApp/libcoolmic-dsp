@@ -71,4 +71,7 @@ int                 coolmic_buffer_set_userdata(coolmic_buffer_t *self, void *us
 coolmic_buffer_t   *coolmic_buffer_get_next(coolmic_buffer_t *self);
 int                 coolmic_buffer_set_next(coolmic_buffer_t *self, coolmic_buffer_t *next);
 
+/* adds a buffer at the end of the chain */
+int                 coolmic_buffer_add_next(coolmic_buffer_t **self, coolmic_buffer_t *next);
+
 #endif

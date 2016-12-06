@@ -208,3 +208,28 @@ int                 coolmic_buffer_set_next(coolmic_buffer_t *self, coolmic_buff
 
     return COOLMIC_ERROR_NONE;
 }
+
+int                 coolmic_buffer_add_next(coolmic_buffer_t **self, coolmic_buffer_t *next)
+{
+    coolmic_buffer_t *cur;
+    int err;
+
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    if (*self) {
+        cur = *self;
+
+        while (cur->next)
+            cur = cur->next;
+
+        return coolmic_buffer_set_next(cur, next);
+    } else {
+        err = coolmic_buffer_ref(next);
+        if (err != COOLMIC_ERROR_NONE)
+            return err;
+
+        *self = next;
+        return COOLMIC_ERROR_NONE;
+    }
+}
