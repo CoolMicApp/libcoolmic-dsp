@@ -142,6 +142,19 @@ ssize_t             coolmic_buffer_get_length(coolmic_buffer_t *self)
     return self->length - self->offset;
 }
 
+int                 coolmic_buffer_set_length(coolmic_buffer_t *self, size_t length)
+{
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    if (length > (self->length - self->offset))
+        return COOLMIC_ERROR_INVAL;
+
+    self->length = length + self->offset;
+
+    return COOLMIC_ERROR_NONE;
+}
+
 int                 coolmic_buffer_set_offset(coolmic_buffer_t *self, size_t offset)
 {
     size_t new_offset;

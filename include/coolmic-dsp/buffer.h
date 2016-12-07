@@ -52,9 +52,16 @@ coolmic_buffer_t   *coolmic_buffer_new_simple(size_t length, void **content);
 int                 coolmic_buffer_ref(coolmic_buffer_t *self);
 int                 coolmic_buffer_unref(coolmic_buffer_t *self);
 
-/* get content and size */
+/* get content */
 void               *coolmic_buffer_get_content(coolmic_buffer_t *self);
+
+/* get and set length
+ * Requests to length changes can fail for several reasons.
+ * This function should only be used to reduce the length of a buffer.
+ * Note: Reducing the length of a buffer may not free memory.
+ */
 ssize_t             coolmic_buffer_get_length(coolmic_buffer_t *self);
+int                 coolmic_buffer_set_length(coolmic_buffer_t *self, size_t length);
 
 /* sets a static offset to the data (shrinks the buffer) */
 int                 coolmic_buffer_set_offset(coolmic_buffer_t *self, size_t offset);
