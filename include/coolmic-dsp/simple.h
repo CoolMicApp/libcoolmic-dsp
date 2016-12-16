@@ -36,68 +36,68 @@ typedef struct coolmic_simple coolmic_simple_t;
 
 /* Connection states */
 typedef enum coolmic_simple_connectionstate {
- /* invalid connection state. */
- COOLMIC_SIMPLE_CS_INVALID              = -1,
- /* API is connecting to the server. */
- COOLMIC_SIMPLE_CS_CONNECTING           =  1,
- /* API successfully connected to the server. */
- COOLMIC_SIMPLE_CS_CONNECTED            =  2,
- /* API is disconnecting from server. */
- COOLMIC_SIMPLE_CS_DISCONNECTING        =  3,
- /* API disconnected (or got disconnected) from server. */
- COOLMIC_SIMPLE_CS_DISCONNECTED         =  4,
- /* There is a connection error.
-  * Next state is likely COOLMIC_SIMPLE_CS_DISCONNECTING,
-  * COOLMIC_SIMPLE_CS_DISCONNECTED or COOLMIC_SIMPLE_CS_CONNECTING.
-  */
- COOLMIC_SIMPLE_CS_CONNECTIONERROR      =  5
+    /* invalid connection state. */
+    COOLMIC_SIMPLE_CS_INVALID              = -1,
+    /* API is connecting to the server. */
+    COOLMIC_SIMPLE_CS_CONNECTING           =  1,
+    /* API successfully connected to the server. */
+    COOLMIC_SIMPLE_CS_CONNECTED            =  2,
+    /* API is disconnecting from server. */
+    COOLMIC_SIMPLE_CS_DISCONNECTING        =  3,
+    /* API disconnected (or got disconnected) from server. */
+    COOLMIC_SIMPLE_CS_DISCONNECTED         =  4,
+    /* There is a connection error.
+     * Next state is likely COOLMIC_SIMPLE_CS_DISCONNECTING,
+     * COOLMIC_SIMPLE_CS_DISCONNECTED or COOLMIC_SIMPLE_CS_CONNECTING.
+     */
+    COOLMIC_SIMPLE_CS_CONNECTIONERROR      =  5
 } coolmic_simple_connectionstate_t;
 
 /* Events emitted by simple API */
 typedef enum coolmic_simple_event {
- /* some invalid event
-  * arg0 and arg1 are undefined.
-  */
- COOLMIC_SIMPLE_EVENT_INVALID           = -1,
- /* no event happend.
-  * arg0 and arg1 are undefined.
-  */
- COOLMIC_SIMPLE_EVENT_NONE              =  0,
- /* an error happend.
-  * arg0 points to an const int containing the error value or NULL.
-  * YOU MUST NOT ALTER THIS VALUE.
-  * arg1 is undefined.
-  */
- COOLMIC_SIMPLE_EVENT_ERROR             =  1,
- /* a thread got started.
-  * arg0 is the pointer (see 'thread' below) to the newly created thread.
-  * arg1 is undefined.
-  */
- COOLMIC_SIMPLE_EVENT_THREAD_START      =  2,
- /* as COOLMIC_SIMPLE_EVENT_THREAD_START but ran inside the thread.
-  * arg0 and arg1 are undefined.
-  */
- COOLMIC_SIMPLE_EVENT_THREAD_POST_START =  3,
- /* a thread is stopped.
-  * arg0 is the pointer (see 'thread' below) to the stopped thread.
-  * arg1 is undefined.
-  */
- COOLMIC_SIMPLE_EVENT_THREAD_STOP       =  4,
- /* as COOLMIC_SIMPLE_EVENT_THREAD_STOP but ran inside the thread.
-  * arg0 and arg1 are undefined.
-  */
- COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP   =  5,
- /* a VU-Meter result is ready for use.
-  * arg0 is the result (coolmic_vumeter_result_t*).
-  * arg1 is undefined.
-  */
- COOLMIC_SIMPLE_EVENT_VUMETER_RESULT    =  6,
- /* A stream state change.
-  * arg0 is a pointer to a coolmic_simple_connectionstate_t object.
-  * arg1 points to an const int containing the error value or NULL.
-  * YOU MUST NOT ALTER THOSE VALUES.
-  */
-COOLMIC_SIMPLE_EVENT_STREAMSTATE        =  7
+    /* some invalid event
+     * arg0 and arg1 are undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_INVALID           = -1,
+    /* no event happend.
+     * arg0 and arg1 are undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_NONE              =  0,
+    /* an error happend.
+     * arg0 points to an const int containing the error value or NULL.
+     * YOU MUST NOT ALTER THIS VALUE.
+     * arg1 is undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_ERROR             =  1,
+    /* a thread got started.
+     * arg0 is the pointer (see 'thread' below) to the newly created thread.
+     * arg1 is undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_THREAD_START      =  2,
+    /* as COOLMIC_SIMPLE_EVENT_THREAD_START but ran inside the thread.
+     * arg0 and arg1 are undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_THREAD_POST_START =  3,
+    /* a thread is stopped.
+     * arg0 is the pointer (see 'thread' below) to the stopped thread.
+     * arg1 is undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_THREAD_STOP       =  4,
+    /* as COOLMIC_SIMPLE_EVENT_THREAD_STOP but ran inside the thread.
+     * arg0 and arg1 are undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP   =  5,
+    /* a VU-Meter result is ready for use.
+     * arg0 is the result (coolmic_vumeter_result_t*).
+     * arg1 is undefined.
+     */
+    COOLMIC_SIMPLE_EVENT_VUMETER_RESULT    =  6,
+    /* A stream state change.
+     * arg0 is a pointer to a coolmic_simple_connectionstate_t object.
+     * arg1 points to an const int containing the error value or NULL.
+     * YOU MUST NOT ALTER THOSE VALUES.
+     */
+    COOLMIC_SIMPLE_EVENT_STREAMSTATE       =  7
 } coolmic_simple_event_t;
 
 /* Generic callback for events.
