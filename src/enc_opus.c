@@ -32,38 +32,6 @@
 #include <coolmic-dsp/metadata.h>
 #include "enc_private.h"
 
-static int libopuserror2error(const int err) {
-    switch (err) {
-        case OPUS_OK:
-            return COOLMIC_ERROR_NONE;
-        break;
-        case OPUS_BAD_ARG:
-            return COOLMIC_ERROR_INVAL;
-        break;
-        case OPUS_BUFFER_TOO_SMALL:
-            return COOLMIC_ERROR_FAULT;
-        break;
-        case OPUS_INVALID_PACKET:
-            return COOLMIC_ERROR_INVAL;
-        break;
-        case OPUS_UNIMPLEMENTED:
-            return COOLMIC_ERROR_NOSYS;
-        break;
-        case OPUS_INVALID_STATE:
-            return COOLMIC_ERROR_INVAL;
-        break;
-        case OPUS_ALLOC_FAIL:
-            return COOLMIC_ERROR_NOMEM;
-        break;
-
-        case OPUS_INTERNAL_ERROR:
-        default:
-            return COOLMIC_ERROR_GENERIC;
-        break;
-    }
-}
-
-
 static void __opus_write_uint32(unsigned char buf[4], uint32_t val)
 {
     buf[0] = (val & 0x000000FF) >>  0;
@@ -74,7 +42,7 @@ static void __opus_write_uint32(unsigned char buf[4], uint32_t val)
 
 static int __opus_build_header(unsigned char header[19], coolmic_enc_t *self)
 {
-    memcpy(header, "OpusHead", 8); /* magic */
+    memcpy(header, COMMON_OPUS_MAGIC_HEAD, COMMON_OPUS_MAGIC_HEAD_LEN); /* magic */
     header[8] = 1; /* version */
     header[9] = self->channels; /* channel count */
     header[10] = 0; /* pre-skip LSB */
@@ -171,7 +139,7 @@ static int __opus_build_tags(coolmic_enc_t *self, void **buffer, size_t *len)
     *buffer = buf;
     *len = retlen;
 
-    memcpy(buf, "OpusTags", 8);
+    memcpy(buf, COMMON_OPUS_MAGIC_TAGS, COMMON_OPUS_MAGIC_TAGS_LEN);
     buf += 8;
 
     __opus_write_uint32(buf, vendor_len);
@@ -278,7 +246,7 @@ static int __opus_packetin_data(coolmic_enc_t *self)
     len = opus_encode(self->codec.opus.enc, data, frames, buffer, sizeof(buffer));
 
     if (len < 0) {
-        err = libopuserror2error(len);
+        err = coolmic_common_opus_libopuserror2error(len);
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, err, "Encoder error");
         return err;
     }
@@ -365,15 +333,15 @@ static int __opus_start_encoder(coolmic_enc_t *self)
         return ret;
     }
 
-    if (self->rate != 48000) {
+    if (self->rate != COMMON_OPUS_RATE) {
         ret = COOLMIC_ERROR_INVAL;
-        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Start failed: bad sampling rate (supported: 48000): %u", self->channels);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Start failed: bad sampling rate (supported: %u): %u", COMMON_OPUS_RATE, self->channels);
         return ret;
     }
 
     self->codec.opus.enc = opus_encoder_create(self->rate, self->channels, OPUS_APPLICATION_AUDIO, &error);
     if (!self->codec.opus.enc) {
-        ret = libopuserror2error(error);
+        ret = coolmic_common_opus_libopuserror2error(error);
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Start failed: can not create encoder");
         return ret;
     }
@@ -381,7 +349,7 @@ static int __opus_start_encoder(coolmic_enc_t *self)
     error = opus_encoder_ctl(self->codec.opus.enc, OPUS_SET_BITRATE(__opus_get_bitrate(self)));
     if (error != OPUS_OK) {
         __opus_stop_encoder(self);
-        ret = libopuserror2error(error);
+        ret = coolmic_common_opus_libopuserror2error(error);
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_ERROR, ret, "Start failed: can not set bitrate");
         return ret;
     }
