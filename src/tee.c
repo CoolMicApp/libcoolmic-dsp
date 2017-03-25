@@ -130,7 +130,7 @@ static void __readjust_buffer(coolmic_tee_t *self, size_t len_request)
 static ssize_t __read_phy(coolmic_tee_t *self, size_t len_request)
 {
     size_t iter;
-    size_t ret;
+    ssize_t ret;
 
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Physical read request, len_request=%zu", len_request);
     __readjust_buffer(self, len_request);
