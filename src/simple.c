@@ -69,8 +69,11 @@ static inline void __emit_event(coolmic_simple_t *self, coolmic_simple_event_t e
     if (!locked)
         pthread_mutex_lock(&(self->lock));
 
-    if (!self->callback)
+    if (!self->callback) {
+        if (!locked)
+            pthread_mutex_unlock(&(self->lock));
         return;
+    }
 
     callback = self->callback;
     callback_userdata = self->callback_userdata;
