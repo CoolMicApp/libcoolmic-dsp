@@ -435,7 +435,7 @@ int                 coolmic_simple_restart_encoder(coolmic_simple_t *self)
         return COOLMIC_ERROR_FAULT;
 
     pthread_mutex_lock(&(self->lock));
-    coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_RESTART);
+    ret = coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_RESTART);
     pthread_mutex_unlock(&(self->lock));
 
     return ret;
