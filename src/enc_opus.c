@@ -36,7 +36,7 @@ static void __opus_write_uint32(unsigned char buf[4], uint32_t val)
 {
     buf[0] = (val & 0x000000FF) >>  0;
     buf[1] = (val & 0x0000FF00) >>  8;
-    buf[2] = (val & 0x00FF0000) >> 18;
+    buf[2] = (val & 0x00FF0000) >> 16;
     buf[3] = (val & 0xFF000000) >> 24;
 }
 
