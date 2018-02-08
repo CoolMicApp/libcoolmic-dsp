@@ -30,6 +30,7 @@
 
 #include <stdint.h>
 #include "shout.h"
+#include "transform.h"
 
 /* forward declare internally used structures */
 typedef struct coolmic_simple coolmic_simple_t;
@@ -164,5 +165,10 @@ int                 coolmic_simple_set_meta(coolmic_simple_t *self, const char *
  * listeners end.
  */
 int                 coolmic_simple_restart_encoder(coolmic_simple_t *self);
+
+/* Get the internally used transform object.
+ * This allows to manipulate the transformation of the input signal by applying e.g. gains.
+ */
+coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self);
 
 #endif

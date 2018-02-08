@@ -26,6 +26,7 @@
 #define COOLMIC_COMPONENT "libcoolmic-dsp/simple"
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <pthread.h>
 #include <coolmic-dsp/simple.h>
 #include <coolmic-dsp/iohandle.h>
@@ -35,6 +36,7 @@
 #include <coolmic-dsp/shout.h>
 #include <coolmic-dsp/vumeter.h>
 #include <coolmic-dsp/metadata.h>
+#include <coolmic-dsp/transform.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/logging.h>
 
@@ -58,6 +60,7 @@ struct coolmic_simple {
     coolmic_vumeter_t *vumeter;
     coolmic_iohandle_t *ogg;
     coolmic_metadata_t *metadata;
+    coolmic_transform_t *transform;
 };
 
 /* emit an event */
@@ -154,9 +157,15 @@ coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, u
             break;
         if ((ret->vumeter = coolmic_vumeter_new(rate, channels)) == NULL)
             break;
+        if ((ret->transform = coolmic_transform_new(rate, channels)) == NULL)
+            break;
         if ((ret->ogg = coolmic_enc_get_iohandle(ret->enc)) == NULL)
             break;
         if ((handle = coolmic_snddev_get_iohandle(ret->dev)) == NULL)
+            break;
+        if (coolmic_transform_attach_iohandle(ret->transform, handle) != 0)
+            break;
+        if ((handle = coolmic_transform_get_iohandle(ret->transform)) == NULL)
             break;
         if (coolmic_tee_attach_iohandle(ret->tee, handle) != 0)
             break;
@@ -212,6 +221,7 @@ int                 coolmic_simple_unref(coolmic_simple_t *self)
     coolmic_enc_unref(self->enc);
     coolmic_snddev_unref(self->dev);
     coolmic_metadata_unref(self->metadata);
+    coolmic_transform_unref(self->transform);
 
     pthread_mutex_unlock(&(self->lock));
     pthread_mutex_destroy(&(self->lock));
@@ -439,4 +449,13 @@ int                 coolmic_simple_restart_encoder(coolmic_simple_t *self)
     pthread_mutex_unlock(&(self->lock));
 
     return ret;
+}
+
+coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self)
+{
+    if (!self)
+        return NULL;
+    if (coolmic_transform_ref(self->transform) != COOLMIC_ERROR_NONE)
+        return NULL;
+    return self->transform;
 }
