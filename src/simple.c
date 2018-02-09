@@ -239,9 +239,8 @@ static inline int __reset(coolmic_simple_t *self)
 }
 
 /* worker */
-static void *__worker(void *userdata)
+static inline void __worker_inner(coolmic_simple_t *self)
 {
-    coolmic_simple_t *self = userdata;
     int running;
     coolmic_shout_t *shout;
     coolmic_vumeter_t *vumeter;
@@ -251,15 +250,10 @@ static void *__worker(void *userdata)
     coolmic_vumeter_result_t vumeter_result;
     int error;
 
-    pthread_mutex_lock(&(self->lock));
-    __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_POST_START, &(self->thread), NULL, NULL);
     if (self->need_reset) {
         if (__reset(self) != 0) {
             self->running = 0;
-            __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
-            self->thread_needs_join = 1;
-            pthread_mutex_unlock(&(self->lock));
-            return NULL;
+            return;
         }
     }
 
@@ -322,6 +316,16 @@ static void *__worker(void *userdata)
     __emit_cs_locked(self, &(self->thread), COOLMIC_SIMPLE_CS_DISCONNECTED, COOLMIC_ERROR_NONE);
     coolmic_shout_unref(shout);
     coolmic_vumeter_unref(vumeter);
+    return;
+}
+
+static void *__worker(void *userdata)
+{
+    coolmic_simple_t *self = userdata;
+
+    pthread_mutex_lock(&(self->lock));
+    __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_POST_START, &(self->thread), NULL, NULL);
+    __worker_inner(self);
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
     self->thread_needs_join = 1;
     pthread_mutex_unlock(&(self->lock));
