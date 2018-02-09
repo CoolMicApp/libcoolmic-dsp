@@ -40,11 +40,17 @@
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/logging.h>
 
+enum coolmic_simple_running {
+    RUNNING_STOPPED = 0,
+    RUNNING_STARTED = 1,
+    RUNNING_STOPPING = 2
+};
+
 struct coolmic_simple {
     size_t refc;
     pthread_mutex_t lock;
     pthread_t thread;
-    int running;
+    enum coolmic_simple_running running;
     int need_reset;
     int thread_needs_join;
 
@@ -119,9 +125,9 @@ static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, i
 
 static void __stop_locked(coolmic_simple_t *self)
 {
-    if (!self->thread_needs_join && self->running != 1)
+    if (!self->thread_needs_join && self->running != RUNNING_STARTED)
         return;
-    self->running = 2;
+    self->running = RUNNING_STOPPING;
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, NULL, &(self->thread), NULL);
     pthread_mutex_unlock(&(self->lock));
     pthread_join(self->thread, NULL);
@@ -241,7 +247,7 @@ static inline int __reset(coolmic_simple_t *self)
 /* worker */
 static inline void __worker_inner(coolmic_simple_t *self)
 {
-    int running;
+    enum coolmic_simple_running running;
     coolmic_shout_t *shout;
     coolmic_vumeter_t *vumeter;
     size_t vumeter_iter = 1;
@@ -252,7 +258,7 @@ static inline void __worker_inner(coolmic_simple_t *self)
 
     if (self->need_reset) {
         if (__reset(self) != 0) {
-            self->running = 0;
+            self->running = RUNNING_STOPPED;
             return;
         }
     }
@@ -271,7 +277,7 @@ static inline void __worker_inner(coolmic_simple_t *self)
         __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTED, COOLMIC_ERROR_NONE);
     }
 
-    while (running == 1) {
+    while (running == RUNNING_STARTED) {
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Still running");
 
         if ((error = coolmic_shout_iter(shout)) != COOLMIC_ERROR_NONE) {
@@ -303,13 +309,13 @@ static inline void __worker_inner(coolmic_simple_t *self)
         }
         if (self->need_reset)
             if (__reset(self) != 0)
-                self->running = 0;
+                self->running = RUNNING_STOPPED;
         running = self->running;
         pthread_mutex_unlock(&(self->lock));
     }
 
     pthread_mutex_lock(&(self->lock));
-    self->running = 0;
+    self->running = RUNNING_STOPPED;
     self->need_reset = 1;
     __emit_cs_locked(self, &(self->thread), COOLMIC_SIMPLE_CS_DISCONNECTING, COOLMIC_ERROR_NONE);
     coolmic_shout_stop(shout);
@@ -335,20 +341,20 @@ static void *__worker(void *userdata)
 /* thread control functions */
 int                 coolmic_simple_start(coolmic_simple_t *self)
 {
-    int running;
+    enum coolmic_simple_running running;
 
     if (!self)
         return COOLMIC_ERROR_FAULT;
     pthread_mutex_lock(&(self->lock));
-    if (!self->running) {
+    if (self->running != RUNNING_STOPPED) {
         if (pthread_create(&(self->thread), NULL, __worker, self) == 0) {
-            self->running = 1;
+            self->running = RUNNING_STARTED;
             __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_START, NULL, &(self->thread), NULL);
         }
     }
     running = self->running;
     pthread_mutex_unlock(&(self->lock));
-    return running ? COOLMIC_ERROR_NONE : COOLMIC_ERROR_GENERIC;
+    return running != RUNNING_STOPPED ? COOLMIC_ERROR_NONE : COOLMIC_ERROR_GENERIC;
 }
 
 int                 coolmic_simple_stop(coolmic_simple_t *self)
