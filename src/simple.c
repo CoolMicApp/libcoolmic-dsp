@@ -270,7 +270,7 @@ static inline void __worker_inner(coolmic_simple_t *self)
 
     __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTING, COOLMIC_ERROR_NONE);
     if ((error = coolmic_shout_start(shout)) != COOLMIC_ERROR_NONE) {
-        running = 0;
+        running = RUNNING_STOPPED;
         __emit_error_unlocked(self, &(self->thread), error);
         __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTIONERROR, error);
     } else {
