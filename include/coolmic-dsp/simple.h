@@ -98,7 +98,14 @@ typedef enum coolmic_simple_event {
      * arg1 points to an const int containing the error value or NULL.
      * YOU MUST NOT ALTER THOSE VALUES.
      */
-    COOLMIC_SIMPLE_EVENT_STREAMSTATE       =  7
+    COOLMIC_SIMPLE_EVENT_STREAMSTATE       =  7,
+    /* A stream reconnect is schedule.
+     * arg0 is a pointer to a const struct timespec thai is
+     *      the remaining time before reconnect.
+     * arg1 is undefined.
+     * YOU MUST NOT ALTER THOSE VALUES.
+     */
+    COOLMIC_SIMPLE_EVENT_RECONNECT         = 8
 } coolmic_simple_event_t;
 
 /* Generic callback for events.
@@ -170,5 +177,13 @@ int                 coolmic_simple_restart_encoder(coolmic_simple_t *self);
  * This allows to manipulate the transformation of the input signal by applying e.g. gains.
  */
 coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self);
+
+
+/* Auto-Reconnect support */
+/* This sets and gets the reconnection profile.
+ * The profile returned by the getter is valid only untill altered using the setter or destrction of the object.
+ */
+int                 coolmic_simple_set_reconnection_profile(coolmic_simple_t *self, const char *profile);
+int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *self, const char **profile);
 
 #endif

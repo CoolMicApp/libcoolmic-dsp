@@ -27,7 +27,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pthread.h>
+#include <time.h>
+#include <errno.h>
 #include <coolmic-dsp/simple.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/snddev.h>
@@ -40,10 +43,15 @@
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/logging.h>
 
+#define RECON_PROFILE_DEFAULT "disabled"
+#define RECON_PROFILE_ENABLED "flat"
+
 enum coolmic_simple_running {
     RUNNING_STOPPED = 0,
     RUNNING_STARTED = 1,
-    RUNNING_STOPPING = 2
+    RUNNING_STOPPING = 2,
+    RUNNING_LOST,
+    RUNNING_ERROR
 };
 
 struct coolmic_simple {
@@ -58,6 +66,9 @@ struct coolmic_simple {
     void *callback_userdata;
 
     size_t vumeter_interval;
+
+    /* Reconnection profile */
+    char *reconnection_profile;
 
     coolmic_snddev_t *dev;
     coolmic_tee_t *tee;
@@ -229,6 +240,8 @@ int                 coolmic_simple_unref(coolmic_simple_t *self)
     coolmic_metadata_unref(self->metadata);
     coolmic_transform_unref(self->transform);
 
+    free(self->reconnection_profile);
+
     pthread_mutex_unlock(&(self->lock));
     pthread_mutex_destroy(&(self->lock));
     free(self);
@@ -258,7 +271,7 @@ static inline void __worker_inner(coolmic_simple_t *self)
 
     if (self->need_reset) {
         if (__reset(self) != 0) {
-            self->running = RUNNING_STOPPED;
+            self->running = RUNNING_ERROR;
             return;
         }
     }
@@ -309,13 +322,14 @@ static inline void __worker_inner(coolmic_simple_t *self)
         }
         if (self->need_reset)
             if (__reset(self) != 0)
-                self->running = RUNNING_STOPPED;
+                self->running = RUNNING_ERROR;
         running = self->running;
         pthread_mutex_unlock(&(self->lock));
     }
 
     pthread_mutex_lock(&(self->lock));
-    self->running = RUNNING_STOPPED;
+    if (self->running != RUNNING_STOPPING)
+        self->running = RUNNING_LOST;
     self->need_reset = 1;
     __emit_cs_locked(self, &(self->thread), COOLMIC_SIMPLE_CS_DISCONNECTING, COOLMIC_ERROR_NONE);
     coolmic_shout_stop(shout);
@@ -325,13 +339,87 @@ static inline void __worker_inner(coolmic_simple_t *self)
     return;
 }
 
+static inline struct timespec __min_ts (struct timespec a, struct timespec b)
+{
+    if (a.tv_sec <= b.tv_sec) {
+        if (a.tv_nsec <= b.tv_nsec) {
+            return a;
+        } else {
+            return b;
+        }
+    } else {
+        return b;
+    }
+}
+
+static inline struct timespec __sub_ts (struct timespec a, struct timespec b)
+{
+    if (b.tv_nsec > a.tv_nsec) {
+        a.tv_sec--;
+        a.tv_nsec += 1000000000;
+    }
+
+    a.tv_nsec -= b.tv_nsec;
+    a.tv_sec  -= b.tv_sec;
+    return a;
+}
+
+static inline int __isnonzero_ts (struct timespec a)
+{
+    return a.tv_sec || a.tv_nsec;
+}
+
+static void __worker_sleep(coolmic_simple_t *self)
+{
+    struct timespec to_sleep, req, rem;
+    int ret;
+    const struct timespec max_sleep = {
+        .tv_sec = 1,
+        .tv_nsec = 0
+    };
+
+    if (!self->reconnection_profile)
+        return;
+
+    memset(&to_sleep, 0, sizeof(to_sleep));
+
+    if (!strcmp(self->reconnection_profile, "flat")) {
+        to_sleep.tv_sec = 10;
+    } else {
+        /* TODO: FIXME: implement error handling here */
+        self->running = RUNNING_STOPPED;
+        return;
+    }
+
+    __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_RECONNECT, &(self->thread), &to_sleep, NULL);
+    while (__isnonzero_ts(to_sleep)) {
+        req = __min_ts(to_sleep, max_sleep);
+        ret = nanosleep(&req, &rem);
+
+        if (ret == -1 && errno == EINTR) {
+            req = __sub_ts(req, rem);
+        }
+
+        to_sleep = __sub_ts(to_sleep, req);
+        __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_RECONNECT, &(self->thread), &to_sleep, NULL);
+    }
+}
+
 static void *__worker(void *userdata)
 {
     coolmic_simple_t *self = userdata;
 
     pthread_mutex_lock(&(self->lock));
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_POST_START, &(self->thread), NULL, NULL);
-    __worker_inner(self);
+    while (1) {
+        __worker_inner(self);
+
+        if (self->running == RUNNING_STOPPED || self->running == RUNNING_STOPPING || !self->reconnection_profile)
+            break;
+
+        __worker_sleep(self);
+        self->running = RUNNING_STARTED;
+    }
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
     self->thread_needs_join = 1;
     pthread_mutex_unlock(&(self->lock));
@@ -469,4 +557,39 @@ coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self)
     if (coolmic_transform_ref(self->transform) != COOLMIC_ERROR_NONE)
         return NULL;
     return self->transform;
+}
+
+int                 coolmic_simple_set_reconnection_profile(coolmic_simple_t *self, const char *profile)
+{
+    char *n;
+
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    if (!profile || !strcmp(profile, "default"))
+        profile = RECON_PROFILE_DEFAULT;
+
+    if (!strcmp(profile, "enabled"))
+        profile = RECON_PROFILE_ENABLED;
+
+    n = strdup(profile);
+    if (!n)
+        return COOLMIC_ERROR_NOMEM;
+
+    pthread_mutex_lock(&(self->lock));
+    free(self->reconnection_profile);
+    self->reconnection_profile = n;
+    pthread_mutex_unlock(&(self->lock));
+
+    return COOLMIC_ERROR_NONE;
+}
+
+int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *self, const char **profile)
+{
+    if (!self || !profile)
+        return COOLMIC_ERROR_FAULT;
+
+    *profile = self->reconnection_profile;
+
+    return COOLMIC_ERROR_NONE;
 }
