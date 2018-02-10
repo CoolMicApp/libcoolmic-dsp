@@ -346,7 +346,7 @@ int                 coolmic_simple_start(coolmic_simple_t *self)
     if (!self)
         return COOLMIC_ERROR_FAULT;
     pthread_mutex_lock(&(self->lock));
-    if (self->running != RUNNING_STOPPED) {
+    if (self->running == RUNNING_STOPPED) {
         if (pthread_create(&(self->thread), NULL, __worker, self) == 0) {
             self->running = RUNNING_STARTED;
             __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_START, NULL, &(self->thread), NULL);
