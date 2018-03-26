@@ -153,6 +153,8 @@ coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, u
     coolmic_simple_t *ret = calloc(1, sizeof(coolmic_simple_t));
     coolmic_iohandle_t *handle;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Config: codec=%s, rate=%llu, channels=%u, buffer=%lli, conf=%p; ret=%p", codec, (long long unsigned int)rate, channels, (long long int)buffer, conf, ret);
+
     if (!ret)
         return NULL;
 
