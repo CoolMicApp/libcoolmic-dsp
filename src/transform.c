@@ -24,10 +24,12 @@
 /* This is the implementation of simple signal transformations.
  */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/transform"
 #include <stdlib.h>
 #include <string.h>
 #include <coolmic-dsp/transform.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <libcoolmic-dsp/include/coolmic-dsp/logging.h>
 
 /* forward declare internally used structures */
 struct coolmic_transform {
@@ -225,7 +227,8 @@ int                    coolmic_transform_set_master_gain(coolmic_transform_t *se
         return COOLMIC_ERROR_NONE;
     } else if (channels == 2 && self->channels == 1) {
         self->master_gain_scale = scale;
-        self->master_gain_gain[0] = ((uint32_t)gain[0] + (uint32_t)gain[1]) / 2;
+        self->master_gain_gain[0] = ((uint32_t)gain[0] + (uint32_t)gain[1]) / (uint32_t)2;
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "gain: scale=%u, gain[0]=%u (in: %u, %u)", (unsigned int)self->master_gain_scale, (unsigned int)self->master_gain_gain[0], (unsigned int)gain[0], (unsigned int)gain[1]);
         return COOLMIC_ERROR_NONE;
     } else {
         return COOLMIC_ERROR_INVAL;
