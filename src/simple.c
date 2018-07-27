@@ -424,8 +424,10 @@ static void *__worker(void *userdata)
         if (self->running == RUNNING_STOPPED || self->running == RUNNING_STOPPING || !self->reconnection_profile)
             break;
 
-        __worker_sleep(self);
         self->running = RUNNING_STARTED;
+        __worker_sleep(self);
+        if (self->running != RUNNING_STARTED)
+            break;
     }
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
     self->thread_needs_join = 1;
