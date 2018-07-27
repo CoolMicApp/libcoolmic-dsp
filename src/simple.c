@@ -136,8 +136,10 @@ static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, i
 
 static void __stop_locked(coolmic_simple_t *self)
 {
-    if (!self->thread_needs_join && self->running != RUNNING_STARTED)
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stopping worker thread requested. thread_needs_join=%i, running=%i", (int)self->thread_needs_join, (int)self->running);
+    if (!(self->thread_needs_join || (self->running != RUNNING_STOPPING && self->running != RUNNING_STOPPED)))
         return;
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stopping worker thread.");
     self->running = RUNNING_STOPPING;
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, NULL, &(self->thread), NULL);
     pthread_mutex_unlock(&(self->lock));
