@@ -376,8 +376,8 @@ static void __worker_sleep(coolmic_simple_t *self)
     struct timespec to_sleep, req, rem;
     int ret;
     const struct timespec max_sleep = {
-        .tv_sec = 1,
-        .tv_nsec = 0
+        .tv_sec = 0,
+        .tv_nsec = 250000000
     };
 
     if (!self->reconnection_profile)
