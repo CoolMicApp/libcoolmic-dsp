@@ -449,9 +449,11 @@ int                 coolmic_simple_stop(coolmic_simple_t *self)
 {
     if (!self)
         return COOLMIC_ERROR_FAULT;
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stop has been called.");
     pthread_mutex_lock(&(self->lock));
     __stop_locked(self);
     pthread_mutex_unlock(&(self->lock));
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stop has completed.");
     return COOLMIC_ERROR_NONE;
 }
 
