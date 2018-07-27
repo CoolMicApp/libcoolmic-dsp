@@ -394,7 +394,9 @@ static void __worker_sleep(coolmic_simple_t *self)
     }
 
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_RECONNECT, &(self->thread), &to_sleep, NULL);
-    while (__isnonzero_ts(to_sleep)) {
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Entering reconnect sleep loop.");
+    while (self->running != RUNNING_STOPPING && __isnonzero_ts(to_sleep)) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Sill need sleep before reconnect");
         req = __min_ts(to_sleep, max_sleep);
         ret = nanosleep(&req, &rem);
 
@@ -405,6 +407,7 @@ static void __worker_sleep(coolmic_simple_t *self)
         to_sleep = __sub_ts(to_sleep, req);
         __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_RECONNECT, &(self->thread), &to_sleep, NULL);
     }
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Left reconnect sleep loop.");
 }
 
 static void *__worker(void *userdata)
