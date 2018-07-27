@@ -398,7 +398,9 @@ static void __worker_sleep(coolmic_simple_t *self)
     while (self->running != RUNNING_STOPPING && __isnonzero_ts(to_sleep)) {
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Sill need sleep before reconnect");
         req = __min_ts(to_sleep, max_sleep);
+        pthread_mutex_unlock(&(self->lock));
         ret = nanosleep(&req, &rem);
+        pthread_mutex_lock(&(self->lock));
 
         if (ret == -1 && errno == EINTR) {
             req = __sub_ts(req, rem);
