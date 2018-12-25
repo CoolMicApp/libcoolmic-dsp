@@ -29,7 +29,7 @@
 #include <string.h>
 #include <coolmic-dsp/transform.h>
 #include <coolmic-dsp/coolmic-dsp.h>
-#include <libcoolmic-dsp/include/coolmic-dsp/logging.h>
+#include <coolmic-dsp/logging.h>
 
 /* forward declare internally used structures */
 struct coolmic_transform {
