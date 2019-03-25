@@ -222,9 +222,6 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->quality  = 0.1;
     ret->cb = cb;
 
-    coolmic_enc_ref(ret);
-    ret->out = coolmic_iohandle_new(ret, (int (*)(void*))coolmic_enc_unref, __read, __eof);
-
     return ret;
 }
 
@@ -241,13 +238,12 @@ int                 coolmic_enc_unref(coolmic_enc_t *self)
     if (!self)
         return COOLMIC_ERROR_FAULT;
     self->refc--;
-    if (self->refc != 1) /* 1 = reference in self->out */
+    if (self->refc != 0)
         return COOLMIC_ERROR_NONE;
 
     __stop(self);
 
     coolmic_iohandle_unref(self->in);
-    coolmic_iohandle_unref(self->out);
     coolmic_metadata_unref(self->metadata);
     free(self);
 
@@ -366,6 +362,6 @@ coolmic_iohandle_t *coolmic_enc_get_iohandle(coolmic_enc_t *self)
 {
     if (!self)
         return NULL;
-    coolmic_iohandle_ref(self->out);
-    return self->out;
+    coolmic_enc_ref(self);
+    return coolmic_iohandle_new(self, (int (*)(void*))coolmic_enc_unref, __read, __eof);
 }

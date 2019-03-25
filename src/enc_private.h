@@ -77,7 +77,6 @@ struct coolmic_enc {
 
     /* IO Handles */
     coolmic_iohandle_t *in;
-    coolmic_iohandle_t *out;
 
     /* Ogg: */
     ogg_stream_state os; /* take physical pages, weld into a logical

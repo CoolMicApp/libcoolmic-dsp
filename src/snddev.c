@@ -62,7 +62,6 @@ struct coolmic_snddev {
     /* driver */
     coolmic_snddev_driver_t driver;
     /* IO Handles */
-    coolmic_iohandle_t *rx; /* Device -data-> Handle */
     coolmic_iohandle_t *tx; /* Handle -data-> Device */
     /* Buffer for TX */
     char txbuffer[1024];
@@ -123,10 +122,6 @@ coolmic_snddev_t   *coolmic_snddev_new(const char *driver, void *device, uint_le
     }
 
     ret->refc = 1;
-    if (flags & COOLMIC_DSP_SNDDEV_RX) {
-        coolmic_snddev_ref(ret);
-        ret->rx = coolmic_iohandle_new(ret, (int (*)(void*))coolmic_snddev_unref, __read, NULL);
-    }
 
     return ret;
 }
@@ -145,10 +140,9 @@ int                 coolmic_snddev_unref(coolmic_snddev_t *self)
         return COOLMIC_ERROR_FAULT;
     self->refc--;
 
-    if (self->refc != 1) /* 1=reference in self->rx */
+    if (self->refc)
         return COOLMIC_ERROR_NONE;
 
-    coolmic_iohandle_unref(self->rx);
     coolmic_iohandle_unref(self->tx);
 
     if (self->driver.free)
@@ -174,8 +168,10 @@ coolmic_iohandle_t *coolmic_snddev_get_iohandle(coolmic_snddev_t *self)
 {
     if (!self)
         return NULL;
-    coolmic_iohandle_ref(self->rx);
-    return self->rx;
+    //if (flags & COOLMIC_DSP_SNDDEV_RX) {
+    //
+    coolmic_snddev_ref(self);
+    return coolmic_iohandle_new(self, (int (*)(void*))coolmic_snddev_unref, __read, NULL);
 }
 
 static inline int __flush_buffer(coolmic_snddev_t *self)
