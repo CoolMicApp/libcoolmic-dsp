@@ -76,4 +76,6 @@ int              coolmic_shout_stop(coolmic_shout_t *self);
  */
 int              coolmic_shout_iter(coolmic_shout_t *self);
 
+int              coolmic_shout_need_next_segment(coolmic_shout_t *self, int *need);
+
 #endif

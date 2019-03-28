@@ -32,6 +32,7 @@ struct coolmic_shout {
     size_t refc;
     shout_t *shout;
     coolmic_iohandle_t *in;
+    int need_next_segment;
 };
 
 static int libshouterror2error(const int err) {
@@ -236,11 +237,29 @@ int              coolmic_shout_iter(coolmic_shout_t *self)
     if (shout_get_connected(self->shout) == SHOUTERR_UNCONNECTED)
         return COOLMIC_ERROR_UNCONNECTED;
 
-    ret = coolmic_iohandle_read(self->in, buffer, sizeof(buffer));
-    if (ret > 0)
-        shouterror = shout_send(self->shout, (void*)buffer, ret);
+    if (self->in) {
+        ret = coolmic_iohandle_read(self->in, buffer, sizeof(buffer));
+        if (ret > 0) {
+            shouterror = shout_send(self->shout, (void*)buffer, ret);
+            self->need_next_segment = 0;
+        } else {
+            self->need_next_segment = 1;
+        }
+    } else {
+        self->need_next_segment = 1;
+    }
 
     shout_sync(self->shout);
 
     return libshouterror2error(shouterror);
+}
+
+int              coolmic_shout_need_next_segment(coolmic_shout_t *self, int *need)
+{
+    if (!self || !need)
+        return COOLMIC_ERROR_FAULT;
+
+    *need = self->need_next_segment;
+
+    return COOLMIC_ERROR_NONE;
 }
