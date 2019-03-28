@@ -157,6 +157,9 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
 
     if (self->state == STATE_NEED_INIT || self->offset_in_page == (self->og.header_len + self->og.body_len)) {
         ret = __need_new_page(self);
+        if (ogg_page_eos(&(self->og))) {
+            self->state = STATE_EOF;
+        }
         if (ret == -2) {
             return 0;
         } else if (ret == -1) {
@@ -312,6 +315,15 @@ int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ..
         break;
         case COOLMIC_ENC_OP_RESTART:
             ret = __restart(self);
+        break;
+        case COOLMIC_ENC_OP_STOP:
+            if (self->state == STATE_RUNNING    || self->state == STATE_EOF ||
+                self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART) {
+                self->state = STATE_NEED_STOP;
+                ret = COOLMIC_ERROR_NONE;
+            } else {
+                ret = COOLMIC_ERROR_BUSY;
+            }
         break;
         case COOLMIC_ENC_OP_GET_QUALITY:
             tmp.fp = va_arg(ap, double*);

@@ -81,7 +81,8 @@ static int __vorbis_read_data(coolmic_enc_t *self)
     unsigned int c;
     size_t i = 0;
 
-    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART) {
+    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART || self->state == STATE_NEED_STOP) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Reached EOF.");
         vorbis_analysis_wrote(&(self->codec.vorbis.vd), 0);
         return 0;
     }
@@ -122,6 +123,9 @@ static int __vorbis_process_flush(coolmic_enc_t *self)
     int ret = 0;
 
     while (vorbis_bitrate_flushpacket(&(self->codec.vorbis.vd), &(self->op))){
+        if (self->op.e_o_s) {
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Packet has EOS set.");
+        }
         ogg_stream_packetin(&(self->os), &(self->op));
         ret = 1;
     }

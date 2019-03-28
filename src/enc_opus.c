@@ -261,7 +261,7 @@ static int __opus_packetin_data(coolmic_enc_t *self)
     self->op.granulepos = self->codec.opus.granulepos;
     self->op.packetno = self->codec.opus.packetno++;
 
-    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART) {
+    if (self->state == STATE_EOF || self->state == STATE_NEED_RESET || self->state == STATE_NEED_RESTART || self->state == STATE_NEED_STOP) {
         self->op.e_o_s = 1;
         self->codec.opus.state = COOLMIC_ENC_OPUS_STATE_EOF;
         self->use_page_flush = 1;

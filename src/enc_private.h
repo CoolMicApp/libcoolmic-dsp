@@ -40,7 +40,8 @@ typedef enum coolmic_enc_state {
     STATE_RUNNING,
     STATE_EOF,
     STATE_NEED_RESET,
-    STATE_NEED_RESTART
+    STATE_NEED_RESTART,
+    STATE_NEED_STOP,
 } coolmic_enc_state_t;
 
 typedef struct coolmic_enc_cb {

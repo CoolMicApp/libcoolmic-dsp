@@ -53,6 +53,7 @@ typedef enum coolmic_enc_op {
     /* Object manipulation: 1-63 */
     COOLMIC_ENC_OP_RESET      = COOLMIC_ENC_OPCODE_DO(1),
     COOLMIC_ENC_OP_RESTART    = COOLMIC_ENC_OPCODE_DO(2),
+    COOLMIC_ENC_OP_STOP       = COOLMIC_ENC_OPCODE_DO(3),
 
     /* Codec parameters: 64-127 */
 
