@@ -50,9 +50,7 @@ typedef struct coolmic_iohandle coolmic_iohandle_t;
  * This function pointer may be NULL to signal endless streams.
  * This function should return -1 for error, 1 when EOF has been reached and 0 otherwise.
  */
-coolmic_iohandle_t *coolmic_iohandle_new(void *userdata, int(*free)(void*), ssize_t(*read)(void*,void*,size_t), int(*eof)(void*));
-int                 coolmic_iohandle_ref(coolmic_iohandle_t *self);
-int                 coolmic_iohandle_unref(coolmic_iohandle_t *self);
+coolmic_iohandle_t *coolmic_iohandle_new(const char *name, igloo_ro_t associated, void *userdata, int(*free)(void*), ssize_t(*read)(void*,void*,size_t), int(*eof)(void*));
 
 /* This function is to read data from the IO Handle.
  * Short reads can occur while reading data.

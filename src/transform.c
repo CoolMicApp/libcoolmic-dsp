@@ -27,14 +27,16 @@
 #define COOLMIC_COMPONENT "libcoolmic-dsp/transform"
 #include <stdlib.h>
 #include <string.h>
+#include "types_private.h"
 #include <coolmic-dsp/transform.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/logging.h>
 
 /* forward declare internally used structures */
 struct coolmic_transform {
-    /* reference counter */
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
+
     /* IO Handle */
     coolmic_iohandle_t *io;
     /* iobuffer */
@@ -49,49 +51,33 @@ struct coolmic_transform {
     uint16_t master_gain_gain[COOLMIC_DSP_TRANSFORM_MAX_CHANNELS];
 };
 
+static void __free_transform(igloo_ro_t self)
+{
+    coolmic_transform_t *transform = igloo_RO_TO_TYPE(self, coolmic_transform_t);
+    igloo_ro_unref(transform->io);
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_transform_t,
+        igloo_RO_TYPEDECL_FREE(__free_transform)
+        );
+
 /* Management of the encoder object */
-coolmic_transform_t   *coolmic_transform_new(uint_least32_t rate, unsigned int channels)
+coolmic_transform_t   *coolmic_transform_new(const char *name, igloo_ro_t associated, uint_least32_t rate, unsigned int channels)
 {
     coolmic_transform_t *self;
 
     if (!rate || !channels)
         return NULL;
 
-    self = calloc(1, sizeof(*self));
+    self = igloo_ro_new_raw(coolmic_transform_t, name, associated);
 
     if (!self)
         return NULL;
 
-    self->refc      = 1;
     self->rate      = rate;
     self->channels  = channels;
 
     return self;
-}
-
-int                 coolmic_transform_ref(coolmic_transform_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc++;
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_transform_unref(coolmic_transform_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-
-    self->refc--;
-
-    if (self->refc) {
-        return COOLMIC_ERROR_NONE;
-    }
-
-    coolmic_iohandle_unref(self->io);
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_transform_attach_iohandle(coolmic_transform_t *self, coolmic_iohandle_t *handle)
@@ -99,9 +85,9 @@ int                 coolmic_transform_attach_iohandle(coolmic_transform_t *self,
     if (!self) 
         return COOLMIC_ERROR_FAULT;
     if (self->io)
-        coolmic_iohandle_unref(self->io);
+        igloo_ro_unref(self->io);
     /* ignore errors here as handle is allowed to be NULL */
-    coolmic_iohandle_ref(self->io = handle);
+    igloo_ro_ref(self->io = handle);
     return COOLMIC_ERROR_NONE;
 }
 
@@ -109,7 +95,7 @@ static int __free(void *userdata)
 {
     coolmic_transform_t *self = userdata;
 
-    return coolmic_transform_unref(self);
+    return igloo_ro_unref(self);
 }
 
 static void __process(coolmic_transform_t *self, int16_t *samples, size_t frames)
@@ -196,12 +182,12 @@ coolmic_iohandle_t *coolmic_transform_get_iohandle(coolmic_transform_t *self)
 {
     coolmic_iohandle_t *ret;
 
-    if (coolmic_transform_ref(self) != COOLMIC_ERROR_NONE)
+    if (igloo_ro_ref(self) != COOLMIC_ERROR_NONE)
         return NULL;
 
-    ret = coolmic_iohandle_new(self, __free, __read, __eof);
+    ret = coolmic_iohandle_new(NULL, igloo_RO_NULL, self, __free, __read, __eof);
     if (!ret)
-        coolmic_transform_unref(self);
+        igloo_ro_unref(self);
 
     return ret;
 }

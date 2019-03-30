@@ -73,9 +73,7 @@ typedef enum coolmic_enc_op {
 } coolmic_enc_op_t;
 
 /* Management of the encoder object */
-coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsigned int channels);
-int                 coolmic_enc_ref(coolmic_enc_t *self);
-int                 coolmic_enc_unref(coolmic_enc_t *self);
+coolmic_enc_t      *coolmic_enc_new(const char *name, igloo_ro_t associated, const char *codec, uint_least32_t rate, unsigned int channels);
 
 /* Reset the encoder state */
 int                 coolmic_enc_reset(coolmic_enc_t *self);

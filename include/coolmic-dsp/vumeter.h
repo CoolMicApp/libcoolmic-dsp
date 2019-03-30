@@ -80,9 +80,7 @@ typedef struct {
 } coolmic_vumeter_result_t;
 
 /* Management of the VU-Meter object */
-coolmic_vumeter_t  *coolmic_vumeter_new(uint_least32_t rate, unsigned int channels);
-int                 coolmic_vumeter_ref(coolmic_vumeter_t *self);
-int                 coolmic_vumeter_unref(coolmic_vumeter_t *self);
+coolmic_vumeter_t  *coolmic_vumeter_new(const char *name, igloo_ro_t associated, uint_least32_t rate, unsigned int channels);
 
 /* Reset the VU-Meter state. This discards all the allready collected data */
 int                 coolmic_vumeter_reset(coolmic_vumeter_t *self);

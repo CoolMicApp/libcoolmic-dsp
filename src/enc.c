@@ -30,9 +30,26 @@
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>
+#include "types_private.h"
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/enc.h>
 #include "enc_private.h"
+
+static int __stop(coolmic_enc_t *self);
+
+static void __free(igloo_ro_t self)
+{
+    coolmic_enc_t *enc = igloo_RO_TO_TYPE(self, coolmic_enc_t);
+
+    __stop(enc);
+
+    igloo_ro_unref(enc->in);
+    igloo_ro_unref(enc->metadata);
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_enc_t,
+        igloo_RO_TYPEDECL_FREE(__free)
+        );
 
 static int __start(coolmic_enc_t *self)
 {
@@ -194,7 +211,7 @@ static int __eof(void *userdata)
     return 0; /* bool */
 }
 
-coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsigned int channels)
+coolmic_enc_t      *coolmic_enc_new(const char *name, igloo_ro_t associated, const char *codec, uint_least32_t rate, unsigned int channels)
 {
     coolmic_enc_t *ret;
     coolmic_enc_cb_t cb;
@@ -214,11 +231,10 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
         return NULL;
     }
 
-    ret = calloc(1, sizeof(coolmic_enc_t));
+    ret = igloo_ro_new_raw(coolmic_enc_t, name, associated);
     if (!ret)
         return NULL;
 
-    ret->refc = 1;
     ret->state = STATE_NEED_INIT;
     ret->rate = rate;
     ret->channels = channels;
@@ -226,31 +242,6 @@ coolmic_enc_t      *coolmic_enc_new(const char *codec, uint_least32_t rate, unsi
     ret->cb = cb;
 
     return ret;
-}
-
-int                 coolmic_enc_ref(coolmic_enc_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc++;
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_enc_unref(coolmic_enc_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc--;
-    if (self->refc != 0)
-        return COOLMIC_ERROR_NONE;
-
-    __stop(self);
-
-    coolmic_iohandle_unref(self->in);
-    coolmic_metadata_unref(self->metadata);
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_enc_reset(coolmic_enc_t *self)
@@ -336,18 +327,18 @@ int                 coolmic_enc_ctl(coolmic_enc_t *self, coolmic_enc_op_t op, ..
         break;
         case COOLMIC_ENC_OP_GET_METADATA:
             tmp.mdp = va_arg(ap, coolmic_metadata_t**);
-            ret = coolmic_metadata_ref(*(tmp.mdp) = self->metadata);
+            ret = igloo_ro_ref(*(tmp.mdp) = self->metadata);
         break;
         case COOLMIC_ENC_OP_SET_METADATA:
             tmp.md = va_arg(ap, coolmic_metadata_t*);
             if (tmp.md) {
-                ret = coolmic_metadata_ref(tmp.md);
+                ret = igloo_ro_ref(tmp.md);
                 if (ret == COOLMIC_ERROR_NONE) {
-                    coolmic_metadata_unref(self->metadata);
+                    igloo_ro_unref(self->metadata);
                     self->metadata = tmp.md;
                 }
             } else {
-                coolmic_metadata_unref(self->metadata);
+                igloo_ro_unref(self->metadata);
                 self->metadata = NULL;
                 ret = COOLMIC_ERROR_NONE;
             }
@@ -364,16 +355,23 @@ int                 coolmic_enc_attach_iohandle(coolmic_enc_t *self, coolmic_ioh
     if (!self)
         return COOLMIC_ERROR_FAULT;
     if (self->in)
-        coolmic_iohandle_unref(self->in);
+        igloo_ro_unref(self->in);
     /* ignore errors here as handle is allowed to be NULL */
-    coolmic_iohandle_ref(self->in = handle);
+    igloo_ro_ref(self->in = handle);
     return COOLMIC_ERROR_NONE;
+}
+
+static int __free_enc_iohandle(void *arg)
+{
+    coolmic_enc_t *enc = arg;
+    igloo_ro_unref(enc);
+    return 0;
 }
 
 coolmic_iohandle_t *coolmic_enc_get_iohandle(coolmic_enc_t *self)
 {
     if (!self)
         return NULL;
-    coolmic_enc_ref(self);
-    return coolmic_iohandle_new(self, (int (*)(void*))coolmic_enc_unref, __read, __eof);
+    igloo_ro_ref(self);
+    return coolmic_iohandle_new(NULL, igloo_RO_NULL, self, __free_enc_iohandle, __read, __eof);
 }

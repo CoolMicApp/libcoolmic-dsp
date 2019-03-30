@@ -56,11 +56,6 @@ typedef struct coolmic_shout_config {
     const char *client_cert; /* client cerificate (TLS) (default: NULL=none) */
 } coolmic_shout_config_t;
 
-/* Management of the encoder object */
-coolmic_shout_t *coolmic_shout_new(void);
-int              coolmic_shout_ref(coolmic_shout_t *self);
-int              coolmic_shout_unref(coolmic_shout_t *self);
-
 /* configure remote connection */
 int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_shout_config_t *conf);
 

@@ -24,18 +24,34 @@
 /* Please see the corresponding header file for details of this API. */
 
 #include <stdlib.h>
+#include "types_private.h"
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
 struct coolmic_iohandle {
-    size_t   refc;
+    /* base type */
+    igloo_ro_base_t __base;
+
     void    *userdata;
     int     (*free)(void *userdata);
     ssize_t (*read)(void *userdata, void *buffer, size_t len);
     int     (*eof )(void *userdata);
 };
 
-coolmic_iohandle_t *coolmic_iohandle_new(void *userdata, int(*free)(void*), ssize_t(*read)(void*,void*,size_t), int(*eof)(void*))
+static void __free(igloo_ro_t self)
+{
+    coolmic_iohandle_t *iohandle = igloo_RO_TO_TYPE(self, coolmic_iohandle_t);
+
+    if (iohandle->free) {
+        iohandle->free(iohandle->userdata);
+    }
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_iohandle_t,
+        igloo_RO_TYPEDECL_FREE(__free)
+        );
+
+coolmic_iohandle_t *coolmic_iohandle_new(const char *name, igloo_ro_t associated, void *userdata, int(*free)(void*), ssize_t(*read)(void*,void*,size_t), int(*eof)(void*))
 {
     coolmic_iohandle_t *ret;
 
@@ -43,45 +59,16 @@ coolmic_iohandle_t *coolmic_iohandle_new(void *userdata, int(*free)(void*), ssiz
     if (!read)
         return NULL;
 
-    ret = calloc(1, sizeof(coolmic_iohandle_t));
+    ret = igloo_ro_new_raw(coolmic_iohandle_t, name, associated);
     if (!ret)
         return NULL;
 
-    ret->refc = 1;
     ret->userdata = userdata;
     ret->free = free;
     ret->read = read;
     ret->eof = eof;
 
     return ret;
-}
-
-int                 coolmic_iohandle_ref(coolmic_iohandle_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc++;
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_iohandle_unref(coolmic_iohandle_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc--;
-    if (self->refc)
-        return COOLMIC_ERROR_NONE;
-
-    if (self->free) {
-        if (self->free(self->userdata) != 0) {
-            self->refc++;
-            return COOLMIC_ERROR_GENERIC;
-        }
-    }
-
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 ssize_t             coolmic_iohandle_read(coolmic_iohandle_t *self, void *buffer, size_t len)

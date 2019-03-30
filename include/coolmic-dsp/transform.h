@@ -37,9 +37,7 @@
 typedef struct coolmic_transform coolmic_transform_t;
 
 /* Management of the encoder object */
-coolmic_transform_t   *coolmic_transform_new(uint_least32_t rate, unsigned int channels);
-int                    coolmic_transform_ref(coolmic_transform_t *self);
-int                    coolmic_transform_unref(coolmic_transform_t *self);
+coolmic_transform_t   *coolmic_transform_new(const char *name, igloo_ro_t associated, uint_least32_t rate, unsigned int channels);
 
 /* This is to attach the IO Handle to the ring buffer */
 int                    coolmic_transform_attach_iohandle(coolmic_transform_t *self, coolmic_iohandle_t *handle);

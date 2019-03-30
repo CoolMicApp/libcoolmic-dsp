@@ -31,6 +31,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <errno.h>
+#include "types_private.h"
 #include <coolmic-dsp/simple.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/snddev.h>
@@ -55,7 +56,9 @@ enum coolmic_simple_running {
 };
 
 struct coolmic_simple {
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
+
     pthread_mutex_t lock;
     pthread_t thread;
     enum coolmic_simple_running running;
@@ -144,13 +147,13 @@ static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, i
 
 static int __segment_disconnect(coolmic_simple_t *self)
 {
-    coolmic_iohandle_unref(self->ogg);
-    coolmic_enc_unref(self->enc);
-    coolmic_snddev_unref(self->dev);
-    coolmic_metadata_unref(self->metadata);
-    coolmic_transform_unref(self->transform);
-    coolmic_tee_unref(self->tee);
-    coolmic_vumeter_unref(self->vumeter);
+    igloo_ro_unref(self->ogg);
+    igloo_ro_unref(self->enc);
+    igloo_ro_unref(self->dev);
+    igloo_ro_unref(self->metadata);
+    igloo_ro_unref(self->transform);
+    igloo_ro_unref(self->tee);
+    igloo_ro_unref(self->vumeter);
 
     self->ogg = NULL;
     self->enc = NULL;
@@ -167,19 +170,19 @@ static int __segment_connect_live(coolmic_simple_t *self) {
     coolmic_iohandle_t *handle;
 
     do {
-        if ((self->metadata = coolmic_metadata_new()) == NULL)
+        if ((self->metadata = igloo_ro_new(coolmic_metadata_t)) == NULL)
             break;
-        if ((self->dev = coolmic_snddev_new(COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+        if ((self->dev = coolmic_snddev_new(NULL, igloo_RO_NULL, COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
             break;
-        if ((self->enc = coolmic_enc_new(self->codec, self->rate, self->channels)) == NULL)
+        if ((self->enc = coolmic_enc_new(NULL, igloo_RO_NULL, self->codec, self->rate, self->channels)) == NULL)
             break;
         if (coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_SET_METADATA, self->metadata) != 0)
             break;
-        if ((self->tee = coolmic_tee_new(2)) == NULL)
+        if ((self->tee = coolmic_tee_new(NULL, igloo_RO_NULL, 2)) == NULL)
             break;
-        if ((self->vumeter = coolmic_vumeter_new(self->rate, self->channels)) == NULL)
+        if ((self->vumeter = coolmic_vumeter_new(NULL, igloo_RO_NULL, self->rate, self->channels)) == NULL)
             break;
-        if ((self->transform = coolmic_transform_new(self->rate, self->channels)) == NULL)
+        if ((self->transform = coolmic_transform_new(NULL, igloo_RO_NULL, self->rate, self->channels)) == NULL)
             break;
         if ((self->ogg = coolmic_enc_get_iohandle(self->enc)) == NULL)
             break;
@@ -187,22 +190,22 @@ static int __segment_connect_live(coolmic_simple_t *self) {
             break;
         if (coolmic_transform_attach_iohandle(self->transform, handle) != 0)
             break;
-        coolmic_iohandle_unref(handle);
+        igloo_ro_unref(handle);
         if ((handle = coolmic_transform_get_iohandle(self->transform)) == NULL)
             break;
         if (coolmic_tee_attach_iohandle(self->tee, handle) != 0)
             break;
-        coolmic_iohandle_unref(handle);
+        igloo_ro_unref(handle);
         if ((handle = coolmic_tee_get_iohandle(self->tee, 0)) == NULL)
             break;
         if (coolmic_enc_attach_iohandle(self->enc, handle) != 0)
             break;
-        coolmic_iohandle_unref(handle);
+        igloo_ro_unref(handle);
         if ((handle = coolmic_tee_get_iohandle(self->tee, 1)) == NULL)
             break;
         if (coolmic_vumeter_attach_iohandle(self->vumeter, handle) != 0)
             break;
-        coolmic_iohandle_unref(handle);
+        igloo_ro_unref(handle);
         if (coolmic_shout_attach_iohandle(self->shout, self->ogg) != 0)
             break;
         return 0;
@@ -218,9 +221,9 @@ static int __segment_connect_file(coolmic_simple_t *self, char *file) {
     self->transform = NULL;
 
     do {
-        if ((self->metadata = coolmic_metadata_new()) == NULL)
+        if ((self->metadata = igloo_ro_new(coolmic_metadata_t)) == NULL)
             break;
-        if ((self->dev = coolmic_snddev_new(COOLMIC_DSP_SNDDEV_DRIVER_STDIO, file, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+        if ((self->dev = coolmic_snddev_new(NULL, igloo_RO_NULL, COOLMIC_DSP_SNDDEV_DRIVER_STDIO, file, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
             break;
         if ((self->ogg = coolmic_snddev_get_iohandle(self->dev)) == NULL)
             break;
@@ -257,16 +260,35 @@ static void __stop_locked(coolmic_simple_t *self)
     self->thread_needs_join = 0;
 }
 
-coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, unsigned int channels, ssize_t buffer, const coolmic_shout_config_t *conf)
+static void __free(igloo_ro_t self)
 {
-    coolmic_simple_t *ret = calloc(1, sizeof(coolmic_simple_t));
+    coolmic_simple_t *simple = igloo_RO_TO_TYPE(self, coolmic_simple_t);
+
+    pthread_mutex_lock(&(simple->lock));
+    __stop_locked(simple);
+    __segment_disconnect(simple);
+    igloo_ro_unref(simple->shout);
+
+    free(simple->reconnection_profile);
+    free(simple->codec);
+
+    pthread_mutex_unlock(&(simple->lock));
+    pthread_mutex_destroy(&(simple->lock));
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_simple_t,
+        igloo_RO_TYPEDECL_FREE(__free)
+        );
+
+coolmic_simple_t   *coolmic_simple_new(const char *name, igloo_ro_t associated, const char *codec, uint_least32_t rate, unsigned int channels, ssize_t buffer, const coolmic_shout_config_t *conf)
+{
+    coolmic_simple_t *ret = igloo_ro_new_raw(coolmic_simple_t, name, associated);
 
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Config: codec=%s, rate=%llu, channels=%u, buffer=%lli, conf=%p; ret=%p", codec, (long long unsigned int)rate, channels, (long long int)buffer, conf, ret);
 
     if (!ret)
         return NULL;
 
-    ret->refc = 1;
     pthread_mutex_init(&(ret->lock), NULL);
 
     ret->vumeter_interval = 20;
@@ -277,53 +299,15 @@ coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, u
     do {
         if ((ret->codec = strdup(codec)) == NULL)
             break;
-        if ((ret->shout = coolmic_shout_new()) == NULL)
+        if ((ret->shout = igloo_ro_new(coolmic_shout_t)) == NULL)
             break;
         if (coolmic_shout_set_config(ret->shout, conf) != 0)
             break;
         return ret;
     } while (0);
 
-    coolmic_simple_unref(ret);
+    igloo_ro_unref(ret);
     return NULL;
-}
-
-int                 coolmic_simple_ref(coolmic_simple_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    pthread_mutex_lock(&(self->lock));
-    self->refc++;
-    pthread_mutex_unlock(&(self->lock));
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_simple_unref(coolmic_simple_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-
-    pthread_mutex_lock(&(self->lock));
-    self->refc--;
-
-    if (self->refc) {
-        pthread_mutex_unlock(&(self->lock));
-        return COOLMIC_ERROR_NONE;
-    }
-
-    __stop_locked(self);
-
-    __segment_disconnect(self);
-    coolmic_shout_unref(self->shout);
-
-    free(self->reconnection_profile);
-    free(self->codec);
-
-    pthread_mutex_unlock(&(self->lock));
-    pthread_mutex_destroy(&(self->lock));
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 /* reset internal objects */
@@ -354,8 +338,8 @@ static inline void __worker_inner(coolmic_simple_t *self)
     }
 
     running = self->running;
-    coolmic_shout_ref(shout = self->shout);
-    coolmic_vumeter_ref(vumeter = self->vumeter);
+    igloo_ro_ref(shout = self->shout);
+    igloo_ro_ref(vumeter = self->vumeter);
     pthread_mutex_unlock(&(self->lock));
 
     __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTING, COOLMIC_ERROR_NONE);
@@ -393,8 +377,8 @@ static inline void __worker_inner(coolmic_simple_t *self)
             pthread_mutex_lock(&(self->lock));
             __segment_disconnect(self);
             __segment_connect(self);
-            coolmic_vumeter_unref(vumeter);
-            coolmic_vumeter_ref(vumeter = self->vumeter);
+            igloo_ro_unref(vumeter);
+            igloo_ro_ref(vumeter = self->vumeter);
             pthread_mutex_unlock(&(self->lock));
         }
 
@@ -436,8 +420,8 @@ static inline void __worker_inner(coolmic_simple_t *self)
     __emit_cs_locked(self, &(self->thread), COOLMIC_SIMPLE_CS_DISCONNECTING, COOLMIC_ERROR_NONE);
     coolmic_shout_stop(shout);
     __emit_cs_locked(self, &(self->thread), COOLMIC_SIMPLE_CS_DISCONNECTED, COOLMIC_ERROR_NONE);
-    coolmic_shout_unref(shout);
-    coolmic_vumeter_unref(vumeter);
+    igloo_ro_unref(shout);
+    igloo_ro_unref(vumeter);
     return;
 }
 
@@ -665,7 +649,7 @@ coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self)
 {
     if (!self)
         return NULL;
-    if (coolmic_transform_ref(self->transform) != COOLMIC_ERROR_NONE)
+    if (igloo_ro_ref(self->transform) != COOLMIC_ERROR_NONE)
         return NULL;
     return self->transform;
 }

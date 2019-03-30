@@ -21,35 +21,16 @@
  * along with Cool Mic.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* This is a dummy sound driver. It supports record and playback.
- * In record mode it will read as zeros (silence).
+/*
+ * This file defines the private common for Opus related parts.
  */
 
-#include <string.h>
-#include "types_private.h"
-#include <coolmic-dsp/snddev.h>
-#include <coolmic-dsp/coolmic-dsp.h>
+#ifndef __COOLMIC_DSP_TYPES_PRIVATE_H__
+#define __COOLMIC_DSP_TYPES_PRIVATE_H__
 
-static ssize_t __read(coolmic_snddev_driver_t *dev, void *buffer, size_t len)
-{
-    (void)dev;
+#include <coolmic-dsp/types.h>
+#define igloo_RO_APPTYPES COOLMIC_DSP_TYPES
+#include <igloo/types.h>
+#include <igloo/ro.h>
 
-    memset(buffer, 0, len);
-    return len;
-}
-
-static ssize_t __write(coolmic_snddev_driver_t *dev, const void *buffer, size_t len)
-{
-    (void)dev, (void)buffer;
-    return len;
-}
-
-int coolmic_snddev_driver_null_open(coolmic_snddev_driver_t *dev, const char *driver, void *device, uint_least32_t rate, unsigned int channels, int flags, ssize_t buffer)
-{
-    (void)driver, (void)device, (void)rate, (void)channels, (void)flags, (void)buffer;
-
-    dev->read = __read;
-    dev->write = __write;
-
-    return COOLMIC_ERROR_NONE;
-}
+#endif

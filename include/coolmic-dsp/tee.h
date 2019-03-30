@@ -34,9 +34,7 @@
 typedef struct coolmic_tee coolmic_tee_t;
 
 /* Management of the tee object */
-coolmic_tee_t      *coolmic_tee_new(size_t readers);
-int                 coolmic_tee_ref(coolmic_tee_t *self);
-int                 coolmic_tee_unref(coolmic_tee_t *self);
+coolmic_tee_t      *coolmic_tee_new(const char *name, igloo_ro_t associated, size_t readers);
 
 /* This is to attach the IO Handle the tee module should read from */
 int                 coolmic_tee_attach_iohandle(coolmic_tee_t *self, coolmic_iohandle_t *handle);

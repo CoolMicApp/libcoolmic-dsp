@@ -27,13 +27,14 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include "types_private.h"
 #include <coolmic-dsp/vumeter.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/logging.h>
 
 struct coolmic_vumeter {
-    /* reference counter */
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
 
     /* input IO handle */
     coolmic_iohandle_t *in;
@@ -55,46 +56,33 @@ struct coolmic_vumeter {
     coolmic_vumeter_result_t result;
 };
 
-coolmic_vumeter_t  *coolmic_vumeter_new(uint_least32_t rate, unsigned int channels)
+static void __free(igloo_ro_t self)
+{
+    coolmic_vumeter_t *vumeter = igloo_RO_TO_TYPE(self, coolmic_vumeter_t);
+    igloo_ro_unref(vumeter->in);
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_vumeter_t,
+        igloo_RO_TYPEDECL_FREE(__free)
+        );
+
+coolmic_vumeter_t  *coolmic_vumeter_new(const char *name, igloo_ro_t associated, uint_least32_t rate, unsigned int channels)
 {
     coolmic_vumeter_t *ret;
 
     if (!rate || !channels)
         return NULL;
 
-    ret = calloc(1, sizeof(coolmic_vumeter_t));
+    ret = igloo_ro_new_raw(coolmic_vumeter_t, name, associated);
     if (!ret)
         return NULL;
 
-    ret->refc = 1;
     ret->rate = rate;
     ret->channels = channels;
 
     coolmic_vumeter_reset(ret);
 
     return ret;
-}
-
-int                 coolmic_vumeter_ref(coolmic_vumeter_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc++;
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_vumeter_unref(coolmic_vumeter_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc--;
-    if (self->refc != 0)
-        return COOLMIC_ERROR_NONE;
-
-    coolmic_iohandle_unref(self->in);
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_vumeter_reset(coolmic_vumeter_t *self)
@@ -115,9 +103,9 @@ int                 coolmic_vumeter_attach_iohandle(coolmic_vumeter_t *self, coo
     if (!self)
         return COOLMIC_ERROR_FAULT;
     if (self->in)
-        coolmic_iohandle_unref(self->in);
+        igloo_ro_unref(self->in);
     /* ignore errors here as handle is allowed to be NULL */
-    coolmic_iohandle_ref(self->in = handle);
+    igloo_ro_ref(self->in = handle);
     return COOLMIC_ERROR_NONE;
 }
 

@@ -27,6 +27,7 @@
 #include <strings.h>
 #include <string.h>
 #include <stdlib.h>
+#include "types_private.h"
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/enc.h>
 #include <coolmic-dsp/metadata.h>

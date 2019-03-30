@@ -26,6 +26,7 @@
  */
 
 #include <stdio.h>
+#include "types_private.h"
 #include <coolmic-dsp/snddev.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
