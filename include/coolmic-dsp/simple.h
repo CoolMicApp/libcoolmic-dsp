@@ -186,4 +186,6 @@ coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self);
 int                 coolmic_simple_set_reconnection_profile(coolmic_simple_t *self, const char *profile);
 int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *self, const char **profile);
 
+int                 coolmic_simple_change_segment(coolmic_simple_t *self, const char *file);
+
 #endif

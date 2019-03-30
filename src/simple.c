@@ -70,6 +70,14 @@ struct coolmic_simple {
     /* Reconnection profile */
     char *reconnection_profile;
 
+    /* Next segment to play. That is a filename or NULL for live. */
+    char *next_segment;
+
+    char *codec;
+    uint_least32_t rate;
+    unsigned int channels;
+    ssize_t buffer;
+
     coolmic_snddev_t *dev;
     coolmic_tee_t *tee;
     coolmic_enc_t *enc;
@@ -134,6 +142,107 @@ static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, i
     __emit_event(self, COOLMIC_SIMPLE_EVENT_ERROR, thread, &error, NULL, 0);
 }
 
+static int __segment_disconnect(coolmic_simple_t *self)
+{
+    coolmic_iohandle_unref(self->ogg);
+    coolmic_enc_unref(self->enc);
+    coolmic_snddev_unref(self->dev);
+    coolmic_metadata_unref(self->metadata);
+    coolmic_transform_unref(self->transform);
+    coolmic_tee_unref(self->tee);
+    coolmic_vumeter_unref(self->vumeter);
+
+    self->ogg = NULL;
+    self->enc = NULL;
+    self->dev = NULL;
+    self->tee = NULL;
+    self->vumeter = NULL;
+    self->metadata = NULL;
+    self->transform = NULL;
+
+    return 0;
+}
+
+static int __segment_connect_live(coolmic_simple_t *self) {
+    coolmic_iohandle_t *handle;
+
+    do {
+        if ((self->metadata = coolmic_metadata_new()) == NULL)
+            break;
+        if ((self->dev = coolmic_snddev_new(COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+            break;
+        if ((self->enc = coolmic_enc_new(self->codec, self->rate, self->channels)) == NULL)
+            break;
+        if (coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_SET_METADATA, self->metadata) != 0)
+            break;
+        if ((self->tee = coolmic_tee_new(2)) == NULL)
+            break;
+        if ((self->vumeter = coolmic_vumeter_new(self->rate, self->channels)) == NULL)
+            break;
+        if ((self->transform = coolmic_transform_new(self->rate, self->channels)) == NULL)
+            break;
+        if ((self->ogg = coolmic_enc_get_iohandle(self->enc)) == NULL)
+            break;
+        if ((handle = coolmic_snddev_get_iohandle(self->dev)) == NULL)
+            break;
+        if (coolmic_transform_attach_iohandle(self->transform, handle) != 0)
+            break;
+        coolmic_iohandle_unref(handle);
+        if ((handle = coolmic_transform_get_iohandle(self->transform)) == NULL)
+            break;
+        if (coolmic_tee_attach_iohandle(self->tee, handle) != 0)
+            break;
+        coolmic_iohandle_unref(handle);
+        if ((handle = coolmic_tee_get_iohandle(self->tee, 0)) == NULL)
+            break;
+        if (coolmic_enc_attach_iohandle(self->enc, handle) != 0)
+            break;
+        coolmic_iohandle_unref(handle);
+        if ((handle = coolmic_tee_get_iohandle(self->tee, 1)) == NULL)
+            break;
+        if (coolmic_vumeter_attach_iohandle(self->vumeter, handle) != 0)
+            break;
+        coolmic_iohandle_unref(handle);
+        if (coolmic_shout_attach_iohandle(self->shout, self->ogg) != 0)
+            break;
+        return 0;
+    } while (0);
+
+    return -1;
+}
+
+static int __segment_connect_file(coolmic_simple_t *self, char *file) {
+    self->enc = NULL;
+    self->tee = NULL;
+    self->vumeter = NULL;
+    self->transform = NULL;
+
+    do {
+        if ((self->metadata = coolmic_metadata_new()) == NULL)
+            break;
+        if ((self->dev = coolmic_snddev_new(COOLMIC_DSP_SNDDEV_DRIVER_STDIO, file, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+            break;
+        if ((self->ogg = coolmic_snddev_get_iohandle(self->dev)) == NULL)
+            break;
+        if (coolmic_shout_attach_iohandle(self->shout, self->ogg) != 0)
+            break;
+        return 0;
+    } while (0);
+
+    return -1;
+}
+
+static int __segment_connect(coolmic_simple_t *self) {
+    if (self->next_segment) {
+        int ret = __segment_connect_file(self, self->next_segment);
+        free(self->next_segment);
+        self->next_segment = NULL;
+        return ret;
+    } else {
+        return __segment_connect_live(self);
+    }
+}
+
 static void __stop_locked(coolmic_simple_t *self)
 {
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stopping worker thread requested. thread_needs_join=%i, running=%i", (int)self->thread_needs_join, (int)self->running);
@@ -151,7 +260,6 @@ static void __stop_locked(coolmic_simple_t *self)
 coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, unsigned int channels, ssize_t buffer, const coolmic_shout_config_t *conf)
 {
     coolmic_simple_t *ret = calloc(1, sizeof(coolmic_simple_t));
-    coolmic_iohandle_t *handle;
 
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Config: codec=%s, rate=%llu, channels=%u, buffer=%lli, conf=%p; ret=%p", codec, (long long unsigned int)rate, channels, (long long int)buffer, conf, ret);
 
@@ -162,49 +270,17 @@ coolmic_simple_t   *coolmic_simple_new(const char *codec, uint_least32_t rate, u
     pthread_mutex_init(&(ret->lock), NULL);
 
     ret->vumeter_interval = 20;
+    ret->rate = rate;
+    ret->channels = channels;
+    ret->buffer = buffer;
 
     do {
-        if ((ret->metadata = coolmic_metadata_new()) == NULL)
-            break;
-        if ((ret->dev = coolmic_snddev_new(COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, rate, channels, COOLMIC_DSP_SNDDEV_RX, buffer)) == NULL)
-            break;
-        if ((ret->enc = coolmic_enc_new(codec, rate, channels)) == NULL)
-            break;
-        if (coolmic_enc_ctl(ret->enc, COOLMIC_ENC_OP_SET_METADATA, ret->metadata) != 0)
+        if ((ret->codec = strdup(codec)) == NULL)
             break;
         if ((ret->shout = coolmic_shout_new()) == NULL)
             break;
-        if ((ret->tee = coolmic_tee_new(2)) == NULL)
-            break;
-        if ((ret->vumeter = coolmic_vumeter_new(rate, channels)) == NULL)
-            break;
-        if ((ret->transform = coolmic_transform_new(rate, channels)) == NULL)
-            break;
-        if ((ret->ogg = coolmic_enc_get_iohandle(ret->enc)) == NULL)
-            break;
-        if ((handle = coolmic_snddev_get_iohandle(ret->dev)) == NULL)
-            break;
-        if (coolmic_transform_attach_iohandle(ret->transform, handle) != 0)
-            break;
-        if ((handle = coolmic_transform_get_iohandle(ret->transform)) == NULL)
-            break;
-        if (coolmic_tee_attach_iohandle(ret->tee, handle) != 0)
-            break;
-        coolmic_iohandle_unref(handle);
-        if ((handle = coolmic_tee_get_iohandle(ret->tee, 0)) == NULL)
-            break;
-        if (coolmic_enc_attach_iohandle(ret->enc, handle) != 0)
-            break;
-        coolmic_iohandle_unref(handle);
-        if (coolmic_shout_attach_iohandle(ret->shout, ret->ogg) != 0)
-            break;
         if (coolmic_shout_set_config(ret->shout, conf) != 0)
             break;
-        if ((handle = coolmic_tee_get_iohandle(ret->tee, 1)) == NULL)
-            break;
-        if (coolmic_vumeter_attach_iohandle(ret->vumeter, handle) != 0)
-            break;
-        coolmic_iohandle_unref(handle);
         return ret;
     } while (0);
 
@@ -237,14 +313,11 @@ int                 coolmic_simple_unref(coolmic_simple_t *self)
 
     __stop_locked(self);
 
-    coolmic_iohandle_unref(self->ogg);
+    __segment_disconnect(self);
     coolmic_shout_unref(self->shout);
-    coolmic_enc_unref(self->enc);
-    coolmic_snddev_unref(self->dev);
-    coolmic_metadata_unref(self->metadata);
-    coolmic_transform_unref(self->transform);
 
     free(self->reconnection_profile);
+    free(self->codec);
 
     pthread_mutex_unlock(&(self->lock));
     pthread_mutex_destroy(&(self->lock));
@@ -295,6 +368,8 @@ static inline void __worker_inner(coolmic_simple_t *self)
     }
 
     while (running == RUNNING_STARTED) {
+        int need_next_segment;
+
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Still running");
 
         if ((error = coolmic_shout_iter(shout)) != COOLMIC_ERROR_NONE) {
@@ -302,19 +377,42 @@ static inline void __worker_inner(coolmic_simple_t *self)
             __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTIONERROR, error);
             break;
         }
-        ret = coolmic_vumeter_read(vumeter, -1);
-        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "VUmeter returned: %zi", ret);
-        if (ret < 0) {
-            __emit_error_unlocked(self, &(self->thread), COOLMIC_ERROR_GENERIC);
-            break;
-        } else if (ret > 0) {
-            vumeter_iter++;
+
+        if (coolmic_shout_need_next_segment(shout, &need_next_segment) != COOLMIC_ERROR_NONE) {
+            need_next_segment = 0;
         }
 
-        if (vumeter_interval && vumeter_iter == vumeter_interval) {
-            vumeter_iter = 0;
-            if (coolmic_vumeter_result(vumeter, &vumeter_result) == 0) {
-                __emit_event_unlocked(self, COOLMIC_SIMPLE_EVENT_VUMETER_RESULT, &(self->thread), &vumeter_result, NULL);
+        if (need_next_segment && self->enc) {
+            if (!coolmic_iohandle_eof(self->ogg)) {
+                need_next_segment = 0;
+            } else {
+            }
+        }
+
+        if (need_next_segment) {
+            pthread_mutex_lock(&(self->lock));
+            __segment_disconnect(self);
+            __segment_connect(self);
+            coolmic_vumeter_unref(vumeter);
+            coolmic_vumeter_ref(vumeter = self->vumeter);
+            pthread_mutex_unlock(&(self->lock));
+        }
+
+        if (vumeter) {
+            ret = coolmic_vumeter_read(vumeter, -1);
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "VUmeter returned: %zi", ret);
+            if (ret < 0) {
+                __emit_error_unlocked(self, &(self->thread), COOLMIC_ERROR_GENERIC);
+                break;
+            } else if (ret > 0) {
+                vumeter_iter++;
+            }
+
+            if (vumeter_interval && vumeter_iter == vumeter_interval) {
+                vumeter_iter = 0;
+                if (coolmic_vumeter_result(vumeter, &vumeter_result) == 0) {
+                    __emit_event_unlocked(self, COOLMIC_SIMPLE_EVENT_VUMETER_RESULT, &(self->thread), &vumeter_result, NULL);
+                }
             }
         }
 
@@ -605,4 +703,28 @@ int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *se
     *profile = self->reconnection_profile;
 
     return COOLMIC_ERROR_NONE;
+}
+
+int                 coolmic_simple_change_segment(coolmic_simple_t *self, const char *file)
+{
+    int ret;
+
+    if (!self)
+        return COOLMIC_ERROR_FAULT;
+
+    pthread_mutex_lock(&(self->lock));
+    free(self->next_segment);
+    if (file) {
+        self->next_segment = strdup(file);
+    } else {
+        self->next_segment = NULL;
+    }
+    if (self->enc) {
+        ret = coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_STOP);
+    } else {
+        ret = COOLMIC_ERROR_BUSY;
+    }
+    pthread_mutex_unlock(&(self->lock));
+
+    return ret;
 }
