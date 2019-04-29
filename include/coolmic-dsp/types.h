@@ -37,6 +37,7 @@ igloo_RO_FORWARD_TYPE(coolmic_tee_t);
 igloo_RO_FORWARD_TYPE(coolmic_vumeter_t);
 igloo_RO_FORWARD_TYPE(coolmic_enc_t);
 igloo_RO_FORWARD_TYPE(coolmic_metadata_t);
+igloo_RO_FORWARD_TYPE(coolmic_simple_segment_t);
 
 #define COOLMIC_DSP_TYPES \
     igloo_RO_TYPE(coolmic_iohandle_t) \
@@ -45,6 +46,7 @@ igloo_RO_FORWARD_TYPE(coolmic_metadata_t);
     igloo_RO_TYPE(coolmic_tee_t) \
     igloo_RO_TYPE(coolmic_vumeter_t) \
     igloo_RO_TYPE(coolmic_enc_t) \
-    igloo_RO_TYPE(coolmic_metadata_t)
+    igloo_RO_TYPE(coolmic_metadata_t) \
+    igloo_RO_TYPE(coolmic_simple_segment_t)
 
 #endif
