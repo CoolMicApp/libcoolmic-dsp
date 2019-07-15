@@ -29,6 +29,8 @@
 #define __COOLMIC_DSP_SIMPLE_H__
 
 #include <stdint.h>
+#include <igloo/ro.h>
+
 #include "shout.h"
 #include "transform.h"
 

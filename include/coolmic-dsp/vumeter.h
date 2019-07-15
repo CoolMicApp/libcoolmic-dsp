@@ -33,7 +33,10 @@
 #define __COOLMIC_DSP_VUMETER_H__
 
 #include <stdint.h>
+#include <igloo/ro.h>
 #include "iohandle.h"
+
+
 
 /* maximum number of channels */
 #define COOLMIC_DSP_VUMETER_MAX_CHANNELS 16

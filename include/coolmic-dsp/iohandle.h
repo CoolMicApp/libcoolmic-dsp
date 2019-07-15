@@ -32,6 +32,7 @@
 #define __COOLMIC_DSP_IOHANDLE_H__
 
 #include <unistd.h>
+#include <igloo/ro.h>
 
 /* forward declare internally used structures */
 typedef struct coolmic_iohandle coolmic_iohandle_t;

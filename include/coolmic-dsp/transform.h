@@ -29,6 +29,7 @@
 #define __COOLMIC_DSP_TRANSFORM_H__
 
 #include <stdint.h>
+#include <igloo/ro.h>
 #include "iohandle.h"
 
 #define COOLMIC_DSP_TRANSFORM_MAX_CHANNELS  16
