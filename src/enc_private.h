@@ -67,7 +67,8 @@ typedef enum coolmic_enc_opus_state {
 } coolmic_enc_opus_state_t;
 
 struct coolmic_enc {
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
 
     /* overall state */
     coolmic_enc_state_t state;

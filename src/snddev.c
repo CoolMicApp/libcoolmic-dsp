@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include "types_private.h"
 #include <coolmic-dsp/snddev.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 #include <coolmic-dsp/logging.h>
@@ -57,8 +58,9 @@ int coolmic_snddev_driver_stdio_open(coolmic_snddev_driver_t *dev, const char *d
 #endif
 
 struct coolmic_snddev {
-    /* reference counter */
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
+
     /* driver */
     coolmic_snddev_driver_t driver;
     /* IO Handles */
@@ -67,6 +69,20 @@ struct coolmic_snddev {
     char txbuffer[1024];
     size_t txbuffer_fill;
 };
+
+static void __free(igloo_ro_t self)
+{
+    coolmic_snddev_t *snddev = igloo_RO_TO_TYPE(self, coolmic_snddev_t);
+
+    igloo_ro_unref(snddev->tx);
+
+    if (snddev->driver.free)
+        snddev->driver.free(&(snddev->driver));
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_snddev_t,
+        igloo_RO_TYPEDECL_FREE(__free)
+        );
 
 static ssize_t __read(void *userdata, void *buffer, size_t len)
 {
@@ -79,7 +95,7 @@ static ssize_t __read(void *userdata, void *buffer, size_t len)
     return self->driver.read(&(self->driver), buffer, len);
 }
 
-coolmic_snddev_t   *coolmic_snddev_new(const char *driver, void *device, uint_least32_t rate, unsigned int channels, int flags, ssize_t buffer)
+coolmic_snddev_t   *coolmic_snddev_new(const char *name, igloo_ro_t associated, const char *driver, void *device, uint_least32_t rate, unsigned int channels, int flags, ssize_t buffer)
 {
     coolmic_snddev_t *ret;
     int (*driver_open)(coolmic_snddev_driver_t*, const char*, void*, uint_least32_t, unsigned int, int, ssize_t) = NULL;
@@ -112,45 +128,16 @@ coolmic_snddev_t   *coolmic_snddev_new(const char *driver, void *device, uint_le
         return NULL;
     }
 
-    ret = calloc(1, sizeof(coolmic_snddev_t));
+    ret = igloo_ro_new_raw(coolmic_snddev_t, name, associated);
     if (!ret)
         return NULL;
 
     if (driver_open(&(ret->driver), driver, device, rate, channels, flags, buffer) != 0) {
-        free(ret);
+        igloo_ro_unref(ret);
         return NULL;
     }
 
-    ret->refc = 1;
-
     return ret;
-}
-
-int                 coolmic_snddev_ref(coolmic_snddev_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc++;
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_snddev_unref(coolmic_snddev_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc--;
-
-    if (self->refc)
-        return COOLMIC_ERROR_NONE;
-
-    coolmic_iohandle_unref(self->tx);
-
-    if (self->driver.free)
-        self->driver.free(&(self->driver));
-
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 int                 coolmic_snddev_attach_iohandle(coolmic_snddev_t *self, coolmic_iohandle_t *handle)
@@ -158,10 +145,17 @@ int                 coolmic_snddev_attach_iohandle(coolmic_snddev_t *self, coolm
     if (!self)
         return COOLMIC_ERROR_FAULT;
     if (self->tx)
-        coolmic_iohandle_unref(self->tx);
+        igloo_ro_unref(self->tx);
     /* ignore errors here as handle is allowed to be NULL */
-    coolmic_iohandle_ref(self->tx = handle);
+    igloo_ro_ref(self->tx = handle);
     return COOLMIC_ERROR_NONE;
+}
+
+static int __free_snddev_iohandle(void *arg)
+{
+    coolmic_snddev_t *snddev = arg;
+    igloo_ro_unref(snddev);
+    return 0;
 }
 
 coolmic_iohandle_t *coolmic_snddev_get_iohandle(coolmic_snddev_t *self)
@@ -170,8 +164,8 @@ coolmic_iohandle_t *coolmic_snddev_get_iohandle(coolmic_snddev_t *self)
         return NULL;
     //if (flags & COOLMIC_DSP_SNDDEV_RX) {
     //
-    coolmic_snddev_ref(self);
-    return coolmic_iohandle_new(self, (int (*)(void*))coolmic_snddev_unref, __read, NULL);
+    igloo_ro_ref(self);
+    return coolmic_iohandle_new(NULL, igloo_RO_NULL, self, __free_snddev_iohandle, __read, NULL);
 }
 
 static inline int __flush_buffer(coolmic_snddev_t *self)

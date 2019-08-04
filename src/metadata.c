@@ -27,6 +27,7 @@
 #include <string.h>
 #include <strings.h>
 #include <pthread.h>
+#include "types_private.h"
 #include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
@@ -40,8 +41,8 @@ struct coolmic_metadata_tag {
 };
 
 struct coolmic_metadata {
-    /* reference counter */
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
 
     /* object lock */
     pthread_mutex_t lock;
@@ -82,6 +83,43 @@ static void __delete_tag(coolmic_metadata_tag_t *tag)
         tag->values_len = 0;
     }
 }
+
+static void __free(igloo_ro_t self)
+{
+    coolmic_metadata_t *metadata = igloo_RO_TO_TYPE(self, coolmic_metadata_t);
+    size_t i;
+
+    pthread_mutex_lock(&(metadata->lock));
+
+    if (metadata->tags) {
+        for (i = 0; i < metadata->tags_len; i++) {
+            if (metadata->tags[i].key != NULL) {
+                __delete_tag(&(metadata->tags[i]));
+            }
+        }
+
+        free(metadata->tags);
+    }
+
+    pthread_mutex_unlock(&(metadata->lock));
+    pthread_mutex_destroy(&(metadata->lock));
+}
+
+static int __new(igloo_ro_t self, const igloo_ro_type_t *type, va_list ap)
+{
+    coolmic_metadata_t *metadata = igloo_RO_TO_TYPE(self, coolmic_metadata_t);
+
+    (void)type, (void)ap;
+
+    pthread_mutex_init(&(metadata->lock), NULL);
+
+    return 0;
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_metadata_t,
+        igloo_RO_TYPEDECL_FREE(__free),
+        igloo_RO_TYPEDECL_NEW(__new)
+        );
 
 static int __add_tag_value (coolmic_metadata_tag_t *tag, const char *value)
 {
@@ -161,63 +199,6 @@ static coolmic_metadata_tag_t * __add_tag(coolmic_metadata_t *self, const char *
         return NULL;
 
     return tag;
-}
-
-/* Management of the metadata object */
-coolmic_metadata_t      *coolmic_metadata_new(void)
-{
-    coolmic_metadata_t *ret;
-
-    ret = calloc(1, sizeof(coolmic_metadata_t));
-    if (!ret)
-        return NULL;
-
-    ret->refc = 1;
-    pthread_mutex_init(&(ret->lock), NULL);
-
-    return ret;
-}
-
-int                 coolmic_metadata_ref(coolmic_metadata_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    pthread_mutex_lock(&(self->lock));
-    self->refc++;
-    pthread_mutex_unlock(&(self->lock));
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_metadata_unref(coolmic_metadata_t *self)
-{
-    size_t i;
-
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-
-    pthread_mutex_lock(&(self->lock));
-    self->refc--;
-
-    if (self->refc) {
-        pthread_mutex_unlock(&(self->lock));
-        return COOLMIC_ERROR_NONE;
-    }
-
-    if (self->tags) {
-        for (i = 0; i < self->tags_len; i++) {
-            if (self->tags[i].key != NULL) {
-                __delete_tag(&(self->tags[i]));
-            }
-        }
-
-        free(self->tags);
-    }
-
-    pthread_mutex_unlock(&(self->lock));
-    pthread_mutex_destroy(&(self->lock));
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 int                      coolmic_metadata_tag_add(coolmic_metadata_t *self, const char *key, const char *value)

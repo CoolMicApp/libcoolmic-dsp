@@ -40,11 +40,6 @@ typedef struct coolmic_metadata_tag coolmic_metadata_tag_t;
  * must be called by the same thread. See below for iterator workflow details.
  */
 
-/* Management of the metadata object */
-coolmic_metadata_t      *coolmic_metadata_new(void);
-int                      coolmic_metadata_ref(coolmic_metadata_t *self);
-int                      coolmic_metadata_unref(coolmic_metadata_t *self);
-
 /* Altering tags */
 /* Those functions cache a lot memory objects.
  * If you completly rewrite and not just do updates you should create a new metadata object each time you start.

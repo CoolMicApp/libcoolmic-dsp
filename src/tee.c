@@ -26,6 +26,7 @@
 #define COOLMIC_COMPONENT "libcoolmic-dsp/tee"
 #include <stdlib.h>
 #include <string.h>
+#include "types_private.h"
 #include <coolmic-dsp/tee.h>
 #include <coolmic-dsp/iohandle.h>
 #include <coolmic-dsp/coolmic-dsp.h>
@@ -42,8 +43,8 @@ typedef struct {
 } backpointer_t;
 
 struct coolmic_tee {
-    /* reference counter */
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
 
     /* number of readers */
     size_t readers;
@@ -63,15 +64,21 @@ struct coolmic_tee {
     /* input IO handle */
     coolmic_iohandle_t *in;
 
-    /* output IO handles */
-    coolmic_iohandle_t *out[MAX_READERS];
-
     /* offsets of IO handles into buffer */
     size_t offset[MAX_READERS];
-
-    /* backpointers */
-    backpointer_t backpointer[MAX_READERS];
 };
+
+static void __free(igloo_ro_t self)
+{
+    coolmic_tee_t *tee = igloo_RO_TO_TYPE(self, coolmic_tee_t);
+
+    igloo_ro_unref(tee->in);
+    free(tee->buffer);
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_tee_t,
+        igloo_RO_TYPEDECL_FREE(__free)
+        );
 
 static void __readjust_buffer(coolmic_tee_t *self, size_t len_request)
 {
@@ -210,52 +217,20 @@ static int __eof(void *userdata)
 }
 
 /* Management of the tee object */
-coolmic_tee_t      *coolmic_tee_new(size_t readers)
+coolmic_tee_t      *coolmic_tee_new(const char *name, igloo_ro_t associated, size_t readers)
 {
     coolmic_tee_t *ret;
-    size_t i;
 
     if (readers < 1 || readers > MAX_READERS)
         return NULL;
 
-    ret = calloc(1, sizeof(coolmic_tee_t));
+    ret = igloo_ro_new_raw(coolmic_tee_t, name, associated);
     if (!ret)
         return NULL;
 
-    ret->refc = 1;
     ret->readers = readers;
 
-    for (i = 0; i < readers; i++) {
-        ret->backpointer[i].parent = ret;
-        ret->backpointer[i].index = i;
-        ret->out[i] = coolmic_iohandle_new(&(ret->backpointer[i]), (int (*)(void*))coolmic_tee_unref, __read, __eof);
-    }
-
     return ret;
-}
-
-int                 coolmic_tee_ref(coolmic_tee_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc++;
-    return COOLMIC_ERROR_NONE;
-}
-
-int                 coolmic_tee_unref(coolmic_tee_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc--;
-    if (self->refc != 0) /* TODO: update this */
-        return COOLMIC_ERROR_NONE;
-
-    coolmic_iohandle_unref(self->in);
-    if (self->buffer)
-        free(self->buffer);
-    free(self);
-
-    return COOLMIC_ERROR_NONE;
 }
 
 /* This is to attach the IO Handle the tee module should read from */
@@ -264,15 +239,29 @@ int                 coolmic_tee_attach_iohandle(coolmic_tee_t *self, coolmic_ioh
     if (!self)
         return COOLMIC_ERROR_FAULT;
     if (self->in)
-        coolmic_iohandle_unref(self->in);
+        igloo_ro_unref(self->in);
     /* ignore errors here as handle is allowed to be NULL */
-    coolmic_iohandle_ref(self->in = handle);
+    igloo_ro_ref(self->in = handle);
     return COOLMIC_ERROR_NONE;
+}
+
+static int __free_backpointer(void *arg)
+{
+    backpointer_t *backpointer = arg;
+
+    igloo_ro_unref(backpointer->parent);
+
+    free(backpointer);
+
+    return 0;
 }
 
 /* This function is to get the IO Handles users can read from */
 coolmic_iohandle_t *coolmic_tee_get_iohandle(coolmic_tee_t *self, ssize_t index)
 {
+    backpointer_t *backpointer;
+    coolmic_iohandle_t *ret;
+
     if (!self)
         return NULL;
     if (index == -1)
@@ -282,6 +271,19 @@ coolmic_iohandle_t *coolmic_tee_get_iohandle(coolmic_tee_t *self, ssize_t index)
 
     self->next_reader = index + 1;
 
-    coolmic_iohandle_ref(self->out[index]);
-    return self->out[index];
+    backpointer = calloc(1, sizeof(backpointer_t));
+    if (!backpointer)
+        return NULL;
+
+
+    igloo_ro_ref(self);
+    backpointer->parent = self;
+    backpointer->index = index;
+
+    ret = coolmic_iohandle_new(NULL, igloo_RO_NULL, backpointer, __free_backpointer, __read, __eof);
+
+    if (!ret)
+        __free_backpointer(backpointer);
+
+    return ret;
 }

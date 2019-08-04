@@ -25,15 +25,55 @@
 
 #include <stdlib.h>
 #include <shout/shout.h>
+#include "types_private.h"
 #include <coolmic-dsp/shout.h>
 #include <coolmic-dsp/coolmic-dsp.h>
 
 struct coolmic_shout {
-    size_t refc;
+    /* base type */
+    igloo_ro_base_t __base;
+
     shout_t *shout;
     coolmic_iohandle_t *in;
     int need_next_segment;
 };
+
+static void __free(igloo_ro_t self)
+{
+    coolmic_shout_t *shout = igloo_RO_TO_TYPE(self, coolmic_shout_t);
+
+    shout_close(shout->shout);
+    shout_free(shout->shout);
+    igloo_ro_unref(shout->in);
+
+    shout_shutdown();
+}
+
+static int __new(igloo_ro_t self, const igloo_ro_type_t *type, va_list ap)
+{
+    coolmic_shout_t *shout = igloo_RO_TO_TYPE(self, coolmic_shout_t);
+
+    (void)type, (void)ap;
+
+    shout_init();
+
+    shout->shout = shout_new();
+    if (!shout->shout) {
+        shout_shutdown();
+        return -1;
+    }
+
+    /* set some stuff that is always the same for all connections */
+    shout_set_protocol(shout->shout, SHOUT_PROTOCOL_HTTP);
+    shout_set_format(shout->shout, SHOUT_FORMAT_OGG);
+
+    return 0;
+}
+
+igloo_RO_PUBLIC_TYPE(coolmic_shout_t,
+        igloo_RO_TYPEDECL_FREE(__free),
+        igloo_RO_TYPEDECL_NEW(__new)
+        );
 
 static int libshouterror2error(const int err) {
     switch (err) {
@@ -90,29 +130,6 @@ static inline int libshout2error(coolmic_shout_t *self) {
     return libshouterror2error(shout_get_errno(self->shout));
 }
 
-coolmic_shout_t *coolmic_shout_new(void)
-{
-    coolmic_shout_t *ret = calloc(1, sizeof(coolmic_shout_t));
-    if (!ret)
-        return NULL;
-
-    shout_init();
-
-    ret->refc = 1;
-    ret->shout = shout_new();
-    if (!ret->shout) {
-        free(ret);
-        shout_shutdown();
-        return NULL;
-    }
-
-    /* set some stuff that is always the same for all connections */
-    shout_set_protocol(ret->shout, SHOUT_PROTOCOL_HTTP);
-    shout_set_format(ret->shout, SHOUT_FORMAT_OGG);
-
-    return ret;
-}
-
 int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_shout_config_t *conf)
 {
     if (!self || !conf)
@@ -159,42 +176,14 @@ int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_s
     return COOLMIC_ERROR_NONE;
 }
 
-int              coolmic_shout_ref(coolmic_shout_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc++;
-    return COOLMIC_ERROR_NONE;
-}
-
-int              coolmic_shout_unref(coolmic_shout_t *self)
-{
-    if (!self)
-        return COOLMIC_ERROR_FAULT;
-    self->refc--;
-
-    if (self->refc)
-        return COOLMIC_ERROR_NONE;
-
-    shout_close(self->shout);
-    shout_free(self->shout);
-    coolmic_iohandle_unref(self->in);
-
-    free(self);
-
-    shout_shutdown();
-
-    return COOLMIC_ERROR_NONE;
-}
-
 int              coolmic_shout_attach_iohandle(coolmic_shout_t *self, coolmic_iohandle_t *handle)
 {
     if (!self)
         return COOLMIC_ERROR_FAULT;
     if (self->in)
-        coolmic_iohandle_unref(self->in);
+        igloo_ro_unref(self->in);
     /* ignore errors here as handle is allowed to be NULL */
-    coolmic_iohandle_ref(self->in = handle);
+    igloo_ro_ref(self->in = handle);
     return COOLMIC_ERROR_NONE;
 }
 
