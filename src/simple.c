@@ -147,6 +147,12 @@ static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, i
 
 static int __segment_disconnect(coolmic_simple_t *self)
 {
+    coolmic_shout_attach_iohandle(self->shout, NULL);
+    coolmic_vumeter_attach_iohandle(self->vumeter, NULL);
+    coolmic_enc_attach_iohandle(self->enc, NULL);
+    coolmic_transform_attach_iohandle(self->transform, NULL);
+    coolmic_tee_attach_iohandle(self->tee, NULL);
+
     igloo_ro_unref(self->ogg);
     igloo_ro_unref(self->enc);
     igloo_ro_unref(self->dev);
