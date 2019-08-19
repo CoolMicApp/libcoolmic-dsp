@@ -623,11 +623,13 @@ int                 coolmic_simple_set_meta(coolmic_simple_t *self, const char *
         return COOLMIC_ERROR_FAULT;
 
     pthread_mutex_lock(&(self->lock));
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "MetaData: %p", self->metadata);
     if (replace) {
         ret = coolmic_metadata_tag_set(self->metadata, key, value);
     } else {
         ret = coolmic_metadata_tag_add(self->metadata, key, value);
     }
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "MetaData: %p -> %i", self->metadata, ret);
     pthread_mutex_unlock(&(self->lock));
 
     return ret;
@@ -641,6 +643,7 @@ int                 coolmic_simple_restart_encoder(coolmic_simple_t *self)
         return COOLMIC_ERROR_FAULT;
 
     pthread_mutex_lock(&(self->lock));
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Restart enc: %p", self->enc);
     ret = coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_RESTART);
     pthread_mutex_unlock(&(self->lock));
 

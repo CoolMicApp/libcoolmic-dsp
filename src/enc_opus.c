@@ -123,12 +123,16 @@ static int __opus_build_tags(coolmic_enc_t *self, void **buffer, size_t *len)
 
     _add_length("ENCODER", "libcoolmic-dsp");
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "--- MetaData ---: %p", metadata);
     while ((tag = coolmic_metadata_iter_next_tag(metadata))) {
         key = coolmic_metadata_iter_tag_key(tag);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "MetaData: %s={}", key);
         while ((value = coolmic_metadata_iter_tag_next_value(tag))) {
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "MetaData: %s=%s", key, value);
             _add_length(key, value);
         }
     }
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "--- MetaData ---");
     coolmic_metadata_iter_rewind(metadata);
 
     buf = malloc(retlen);

@@ -205,6 +205,8 @@ static int __eof(void *userdata)
 {
     coolmic_enc_t *self = userdata;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "self=%p{.offset_in_page=%i, .og.header_len=%i, .og.body_len=%i, .state=%i, ...} = ?", (int)self->offset_in_page, (int)self->og.header_len, (int)self->og.body_len, (int)self->state);
+
     if (self->offset_in_page == (self->og.header_len + self->og.body_len) && self->state == STATE_EOF)
         return 1; /* bool */
 
@@ -276,6 +278,7 @@ static inline int __restart(coolmic_enc_t *self)
     if (self->state != STATE_RUNNING && self->state != STATE_EOF)
         return COOLMIC_ERROR_GENERIC;
     self->state = STATE_NEED_RESTART;
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_INFO, COOLMIC_ERROR_NONE, "Reset request -> OK");
     return COOLMIC_ERROR_NONE;
 }
 

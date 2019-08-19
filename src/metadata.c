@@ -23,6 +23,7 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/metadata"
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -30,6 +31,7 @@
 #include "types_private.h"
 #include <coolmic-dsp/metadata.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/logging.h>
 
 #define TAG_SLOT_INCREMENT 8 /* how many tag slots to add when in need for a new one. */
 
@@ -57,6 +59,8 @@ struct coolmic_metadata {
 static void __clear_tag_values(coolmic_metadata_tag_t *tag)
 {
     size_t i;
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "clear tag=%p", tag);
 
     if (!tag->values)
         return;
@@ -88,6 +92,8 @@ static void __free(igloo_ro_t self)
 {
     coolmic_metadata_t *metadata = igloo_RO_TO_TYPE(self, coolmic_metadata_t);
     size_t i;
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "__free(self=%p)", self);
 
     pthread_mutex_lock(&(metadata->lock));
 
@@ -127,6 +133,8 @@ static int __add_tag_value (coolmic_metadata_tag_t *tag, const char *value)
     char **values_new;
     char **next;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, " %p \"%s\" -> \"%s\"", tag, tag->key, value);
+
     /* first see if we got a free slot. */
     if (tag->values) {
         for (i = 0; i < tag->values_len; i++) {
@@ -136,6 +144,8 @@ static int __add_tag_value (coolmic_metadata_tag_t *tag, const char *value)
             tag->values[i] = strdup(value);
             if (!tag->values[i])
                 return COOLMIC_ERROR_NOMEM;
+
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, " %p \"%s\" -> \"%s\" -> OK", tag, tag->key, value);
             return COOLMIC_ERROR_NONE;
         }
     }
@@ -153,6 +163,8 @@ static int __add_tag_value (coolmic_metadata_tag_t *tag, const char *value)
     *next = strdup(value);
     if (!*next)
         return COOLMIC_ERROR_NOMEM;
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, " %p \"%s\" -> \"%s\" -> OK", tag, tag->key, value);
     return COOLMIC_ERROR_NONE;
 }
 
@@ -206,6 +218,8 @@ int                      coolmic_metadata_tag_add(coolmic_metadata_t *self, cons
     coolmic_metadata_tag_t *tag;
     int ret;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "self=%p, key=\"%s\" -> value=\"%s\"", self, key, value);
+
     if (!self || !key || !value)
         return COOLMIC_ERROR_FAULT;
 
@@ -215,6 +229,8 @@ int                      coolmic_metadata_tag_add(coolmic_metadata_t *self, cons
         pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NOMEM;
     }
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "tag=%p \"%s\" -> \"%s\"", tag, tag->key, value);
 
     ret = __add_tag_value(tag, value);
     pthread_mutex_unlock(&(self->lock));
@@ -226,6 +242,8 @@ int                      coolmic_metadata_tag_set(coolmic_metadata_t *self, cons
     coolmic_metadata_tag_t *tag;
     int ret;
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "self=%p, key=\"%s\" -> value=\"%s\"", self, key, value);
+
     if (!self || !key || !value)
         return COOLMIC_ERROR_FAULT;
 
@@ -235,6 +253,8 @@ int                      coolmic_metadata_tag_set(coolmic_metadata_t *self, cons
         pthread_mutex_unlock(&(self->lock));
         return COOLMIC_ERROR_NOMEM;
     }
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "tag=%p \"%s\" -> \"%s\"", tag, tag->key, value);
 
     __clear_tag_values(tag);
     ret = __add_tag_value(tag, value);
@@ -324,6 +344,8 @@ coolmic_metadata_tag_t  *coolmic_metadata_iter_next_tag(coolmic_metadata_t *self
 {
     if (!self)
         return NULL;
+
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "self=%p{.iter_tag=%i, .tags_len=%i, ...}", self, (int)self->iter_tag, (int)self->tags_len);
 
     for (; self->iter_tag < self->tags_len; self->iter_tag++) {
         if (self->tags[self->iter_tag].key) {
