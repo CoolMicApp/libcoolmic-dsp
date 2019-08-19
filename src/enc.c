@@ -256,7 +256,7 @@ int                 coolmic_enc_reset(coolmic_enc_t *self)
     /* send EOF event */
     self->state = STATE_EOF;
 
-    /* no process to EOS page and then reset the encoder */
+    /* now process to EOS page and then reset the encoder */
     while (__need_new_page(self) == 0)
         if (ogg_page_eos(&(self->og)))
             break;
