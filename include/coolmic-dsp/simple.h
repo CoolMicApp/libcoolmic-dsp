@@ -29,10 +29,12 @@
 #define __COOLMIC_DSP_SIMPLE_H__
 
 #include <stdint.h>
-#include <igloo/ro.h>
 
+#include <igloo/ro.h>
+#include <igloo/list.h>
 #include "shout.h"
 #include "transform.h"
+#include "simple-segment.h"
 
 /* forward declare internally used structures */
 typedef struct coolmic_simple coolmic_simple_t;
@@ -186,6 +188,9 @@ coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self);
 int                 coolmic_simple_set_reconnection_profile(coolmic_simple_t *self, const char *profile);
 int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *self, const char **profile);
 
-int                 coolmic_simple_change_segment(coolmic_simple_t *self, const char *file);
+coolmic_simple_segment_t *  coolmic_simple_get_segment(coolmic_simple_t *self);
+igloo_list_t *              coolmic_simple_get_segment_list(coolmic_simple_t *self);
+int                         coolmic_simple_queue_segment(coolmic_simple_t *self, coolmic_simple_segment_t *segment);
+int                         coolmic_simple_switch_segment(coolmic_simple_t *self);
 
 #endif

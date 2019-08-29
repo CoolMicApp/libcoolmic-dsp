@@ -75,6 +75,8 @@ struct coolmic_simple {
 
     /* Next segment to play. That is a filename or NULL for live. */
     char *next_segment;
+    coolmic_simple_segment_t *current_segment;
+    igloo_list_t *segment_list;
 
     char *codec;
     uint_least32_t rate;
@@ -269,6 +271,8 @@ static void __free(igloo_ro_t self)
     __segment_disconnect(simple);
     igloo_ro_unref(simple->shout);
 
+    igloo_ro_unref(simple->segment_list);
+
     free(simple->reconnection_profile);
     free(simple->codec);
 
@@ -297,6 +301,10 @@ coolmic_simple_t   *coolmic_simple_new(const char *name, igloo_ro_t associated, 
     ret->buffer = buffer;
 
     do {
+        if ((ret->segment_list = igloo_ro_new(igloo_list_t)) == NULL)
+            break;
+        if (igloo_list_set_type(ret->segment_list, coolmic_simple_segment_t) != 0)
+            break;
         if ((ret->codec = strdup(codec)) == NULL)
             break;
         if ((ret->shout = igloo_ro_new(coolmic_shout_t)) == NULL)
@@ -692,6 +700,58 @@ int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *se
     *profile = self->reconnection_profile;
 
     return COOLMIC_ERROR_NONE;
+}
+
+coolmic_simple_segment_t *  coolmic_simple_get_segment(coolmic_simple_t *self)
+{
+    coolmic_simple_segment_t *ret;
+
+    if (!self)
+        return NULL;
+
+    pthread_mutex_lock(&(self->lock));
+    if (igloo_ro_ref(self->current_segment) != 0) {
+        pthread_mutex_unlock(&(self->lock));
+        return NULL;
+    }
+    ret = self->current_segment;
+    pthread_mutex_unlock(&(self->lock));
+
+    return ret;
+}
+
+igloo_list_t *              coolmic_simple_get_segment_list(coolmic_simple_t *self)
+{
+    igloo_list_t *ret;
+
+    if (!self)
+        return NULL;
+
+    pthread_mutex_lock(&(self->lock));
+    if (igloo_ro_ref(self->segment_list) != 0) {
+        pthread_mutex_unlock(&(self->lock));
+        return NULL;
+    }
+    ret = self->segment_list;
+    pthread_mutex_unlock(&(self->lock));
+
+    return ret;
+}
+
+int                         coolmic_simple_queue_segment(coolmic_simple_t *self, coolmic_simple_segment_t *segment)
+{
+    int ret;
+
+    if (!self || !segment)
+        return COOLMIC_ERROR_FAULT;
+
+    pthread_mutex_lock(&(self->lock));
+    ret = igloo_list_push(self->segment_list, segment);
+    pthread_mutex_unlock(&(self->lock));
+
+    if (ret != 0)
+        return COOLMIC_ERROR_GENERIC;
+    return 0;
 }
 
 int                 coolmic_simple_change_segment(coolmic_simple_t *self, const char *file)
