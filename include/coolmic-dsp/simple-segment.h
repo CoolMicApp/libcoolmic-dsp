@@ -29,6 +29,7 @@
 #define __COOLMIC_DSP_SIMPLE_SEGMENT_H__
 
 #include <stdint.h>
+#include <coolmic-dsp/iohandle.h>
 
 /* forward declare internally used structures */
 typedef struct coolmic_simple_segment coolmic_simple_segment_t;
@@ -38,8 +39,8 @@ typedef enum {
     COOLMIC_SIMPLE_SP_FILE_SIMPLE,
 } coolmic_simple_segment_pipeline_t;
 
-coolmic_simple_segment_t *  coolmic_simple_segment_new(const char *name, igloo_ro_t associated, coolmic_simple_segment_pipeline_t pipeline, const char *driver, const char *device);
+coolmic_simple_segment_t *  coolmic_simple_segment_new(const char *name, igloo_ro_t associated, coolmic_simple_segment_pipeline_t pipeline, const char *driver, const char *device, coolmic_iohandle_t *iohandle);
 int                         coolmic_simple_segment_get_pipeline(coolmic_simple_segment_t *segment, coolmic_simple_segment_pipeline_t *pipeline);
-int                         coolmic_simple_segment_get_driver_and_device(coolmic_simple_segment_t *segment, const char **driver, const char **device);
+int                         coolmic_simple_segment_get_driver_and_device(coolmic_simple_segment_t *segment, const char **driver, const char **device, coolmic_iohandle_t **iohandle);
 
 #endif

@@ -36,6 +36,8 @@ struct coolmic_simple_segment {
     coolmic_simple_segment_pipeline_t pipeline;
     char *driver;
     char *device;
+
+    coolmic_iohandle_t *iohandle;
 };
 
 static void __free(igloo_ro_t self)
@@ -44,13 +46,15 @@ static void __free(igloo_ro_t self)
 
     free(segment->driver);
     free(segment->device);
+
+    igloo_ro_unref(segment->iohandle);
 }
 
 igloo_RO_PUBLIC_TYPE(coolmic_simple_segment_t,
         igloo_RO_TYPEDECL_FREE(__free)
         );
 
-coolmic_simple_segment_t *  coolmic_simple_segment_new(const char *name, igloo_ro_t associated, coolmic_simple_segment_pipeline_t pipeline, const char *driver, const char *device)
+coolmic_simple_segment_t *  coolmic_simple_segment_new(const char *name, igloo_ro_t associated, coolmic_simple_segment_pipeline_t pipeline, const char *driver, const char *device, coolmic_iohandle_t *iohandle)
 {
     coolmic_simple_segment_t *ret;
     char * n_driver;
@@ -66,10 +70,20 @@ coolmic_simple_segment_t *  coolmic_simple_segment_new(const char *name, igloo_r
 
     if (device) {
         n_device = strdup(device);
-        if (!n_device)
+        if (!n_device) {
+            free(n_driver);
             return NULL;
+        }
     } else {
         n_device = NULL;
+    }
+
+    if (iohandle) {
+        if (igloo_ro_ref(iohandle) != 0) {
+            free(n_driver);
+            free(n_device);
+            return NULL;
+        }
     }
 
     ret = igloo_ro_new_raw(coolmic_simple_segment_t, name, associated);
@@ -79,6 +93,7 @@ coolmic_simple_segment_t *  coolmic_simple_segment_new(const char *name, igloo_r
     ret->pipeline = pipeline;
     ret->driver = n_driver;
     ret->device = n_device;
+    ret->iohandle = iohandle;
 
     return ret;
 }
@@ -94,7 +109,7 @@ int                         coolmic_simple_segment_get_pipeline(coolmic_simple_s
     return 0;
 }
 
-int                         coolmic_simple_segment_get_driver_and_device(coolmic_simple_segment_t *segment, const char **driver, const char **device)
+int                         coolmic_simple_segment_get_driver_and_device(coolmic_simple_segment_t *segment, const char **driver, const char **device, coolmic_iohandle_t **iohandle)
 {
     if (!segment)
         return COOLMIC_ERROR_FAULT;
@@ -104,6 +119,15 @@ int                         coolmic_simple_segment_get_driver_and_device(coolmic
 
     if (device)
         *device = segment->device;
+
+    if (iohandle) {
+        *iohandle = NULL;
+        if (segment->iohandle) {
+            if (igloo_ro_ref(segment->iohandle) != 0)
+                return -1;
+            *iohandle = segment->iohandle;
+        }
+    }
 
     return 0;
 }
