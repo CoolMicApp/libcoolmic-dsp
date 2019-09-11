@@ -74,7 +74,6 @@ struct coolmic_simple {
     char *reconnection_profile;
 
     /* Next segment to play. That is a filename or NULL for live. */
-    char *next_segment;
     coolmic_simple_segment_t *current_segment;
     igloo_list_t *segment_list;
 
@@ -161,6 +160,7 @@ static int __segment_disconnect(coolmic_simple_t *self)
     igloo_ro_unref(self->transform);
     igloo_ro_unref(self->tee);
     igloo_ro_unref(self->vumeter);
+    igloo_ro_unref(self->current_segment);
 
     self->ogg = NULL;
     self->enc = NULL;
@@ -168,15 +168,19 @@ static int __segment_disconnect(coolmic_simple_t *self)
     self->tee = NULL;
     self->vumeter = NULL;
     self->transform = NULL;
+    self->current_segment = NULL;
 
     return 0;
 }
 
 static int __segment_connect_live(coolmic_simple_t *self) {
     coolmic_iohandle_t *handle;
+    const char *driver;
+    const char *device;
+    coolmic_iohandle_t *iohandle;
 
     do {
-        if ((self->dev = coolmic_snddev_new(NULL, igloo_RO_NULL, COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+        if (coolmic_simple_segment_get_driver_and_device(self->current_segment, &driver, &device, &iohandle) != COOLMIC_ERROR_NONE)
             break;
         if ((self->enc = coolmic_enc_new(NULL, igloo_RO_NULL, self->codec, self->rate, self->channels)) == NULL)
             break;
@@ -190,8 +194,14 @@ static int __segment_connect_live(coolmic_simple_t *self) {
             break;
         if ((self->ogg = coolmic_enc_get_iohandle(self->enc)) == NULL)
             break;
-        if ((handle = coolmic_snddev_get_iohandle(self->dev)) == NULL)
-            break;
+        if (iohandle == NULL) {
+            if ((self->dev = coolmic_snddev_new(NULL, igloo_RO_NULL, driver, (void*)device, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+                break;
+            if ((handle = coolmic_snddev_get_iohandle(self->dev)) == NULL)
+                break;
+        } else {
+            handle = iohandle;
+        }
         if (coolmic_transform_attach_iohandle(self->transform, handle) != 0)
             break;
         igloo_ro_unref(handle);
@@ -218,17 +228,27 @@ static int __segment_connect_live(coolmic_simple_t *self) {
     return -1;
 }
 
-static int __segment_connect_file(coolmic_simple_t *self, char *file) {
+static int __segment_connect_file(coolmic_simple_t *self) {
+    const char *driver;
+    const char *device;
+    coolmic_iohandle_t *iohandle;
+
     self->enc = NULL;
     self->tee = NULL;
     self->vumeter = NULL;
     self->transform = NULL;
 
     do {
-        if ((self->dev = coolmic_snddev_new(NULL, igloo_RO_NULL, COOLMIC_DSP_SNDDEV_DRIVER_STDIO, file, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+        if (coolmic_simple_segment_get_driver_and_device(self->current_segment, &driver, &device, &iohandle) != COOLMIC_ERROR_NONE)
             break;
-        if ((self->ogg = coolmic_snddev_get_iohandle(self->dev)) == NULL)
-            break;
+        if (iohandle == NULL) {
+            if ((self->dev = coolmic_snddev_new(NULL, igloo_RO_NULL, driver, (void*)device, self->rate, self->channels, COOLMIC_DSP_SNDDEV_RX, self->buffer)) == NULL)
+                break;
+            if ((self->ogg = coolmic_snddev_get_iohandle(self->dev)) == NULL)
+                break;
+        } else {
+            self->ogg = iohandle;
+        }
         if (coolmic_shout_attach_iohandle(self->shout, self->ogg) != 0)
             break;
         return 0;
@@ -237,15 +257,38 @@ static int __segment_connect_file(coolmic_simple_t *self, char *file) {
     return -1;
 }
 
-static int __segment_connect(coolmic_simple_t *self) {
-    if (self->next_segment) {
-        int ret = __segment_connect_file(self, self->next_segment);
-        free(self->next_segment);
-        self->next_segment = NULL;
-        return ret;
-    } else {
-        return __segment_connect_live(self);
+static coolmic_simple_segment_t * __segment_get_next(coolmic_simple_t *self)
+{
+    coolmic_simple_segment_t *ret = NULL;
+
+    ret = igloo_list_shift(self->segment_list);
+
+    if (!ret) {
+        ret = coolmic_simple_segment_new(NULL, igloo_RO_NULL, COOLMIC_SIMPLE_SP_LIVE, COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, NULL);
     }
+
+    return ret;
+}
+
+static int __segment_connect(coolmic_simple_t *self) {
+    coolmic_simple_segment_pipeline_t pipeline;
+
+    igloo_ro_unref(self->current_segment);
+    self->current_segment = __segment_get_next(self);
+
+    if (coolmic_simple_segment_get_pipeline(self->current_segment, &pipeline) != 0)
+        return -1;
+
+    switch (pipeline) {
+        case COOLMIC_SIMPLE_SP_LIVE:
+            return __segment_connect_live(self);
+        break;
+        case COOLMIC_SIMPLE_SP_FILE_SIMPLE:
+            return __segment_connect_file(self);
+        break;
+    }
+
+    return -1;
 }
 
 static void __stop_locked(coolmic_simple_t *self)
@@ -754,7 +797,7 @@ int                         coolmic_simple_queue_segment(coolmic_simple_t *self,
     return 0;
 }
 
-int                 coolmic_simple_change_segment(coolmic_simple_t *self, const char *file)
+int                         coolmic_simple_switch_segment(coolmic_simple_t *self)
 {
     int ret;
 
@@ -762,12 +805,6 @@ int                 coolmic_simple_change_segment(coolmic_simple_t *self, const 
         return COOLMIC_ERROR_FAULT;
 
     pthread_mutex_lock(&(self->lock));
-    free(self->next_segment);
-    if (file) {
-        self->next_segment = strdup(file);
-    } else {
-        self->next_segment = NULL;
-    }
     if (self->enc) {
         ret = coolmic_enc_ctl(self->enc, COOLMIC_ENC_OP_STOP);
     } else {
