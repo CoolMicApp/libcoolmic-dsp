@@ -22,6 +22,6 @@ $(TARGET): $(OBJS)
 	$(CC) $(LDFLAGS) -shared -o $(TARGET) $(OBJS) $(LIBS)
 
 test-%: test-%.c
-	$(CC) $(CFLAGS) -o $@ $< $(LFLAGS) $(TARGET)
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS) $(TARGET) -ligloo
 
 .PHONY: all clean new distclean

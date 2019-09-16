@@ -25,7 +25,7 @@ CMDSP_SOURCE_FILES = \
 
 CMDSP_CFLAGS  = -Wall -Wextra -O2 -g -fPIC -I../include -DHAVE_SNDDRV_DRIVER_STDIO -DHAVE_ENC_OPUS -D_GNU_SOURCE
 CMDSP_LDFLAGS = -Wall -Wextra -O2 -g
-CMDSP_LIBS    = -pthread -lshout -lvorbis -lvorbisenc -lm -lopus
+CMDSP_LIBS    = -pthread -lshout -lvorbis -lvorbisenc -lm -lopus -ligloo
 
 ifeq ($(CMDSP_HAVE_OSS),true)
 	CMDSP_SOURCE_FILES += snddev_oss.c
