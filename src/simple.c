@@ -313,6 +313,7 @@ static void __free(igloo_ro_t self)
     __stop_locked(simple);
     __segment_disconnect(simple);
     igloo_ro_unref(simple->shout);
+    igloo_ro_unref(simple->metadata);
 
     igloo_ro_unref(simple->segment_list);
 
