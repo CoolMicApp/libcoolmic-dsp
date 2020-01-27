@@ -102,7 +102,7 @@ typedef enum coolmic_simple_event {
      */
     COOLMIC_SIMPLE_EVENT_STREAMSTATE       =  7,
     /* A stream reconnect is schedule.
-     * arg0 is a pointer to a const struct timespec thai is
+     * arg0 is a pointer to a const struct timespec that is
      *      the remaining time before reconnect.
      * arg1 is undefined.
      * YOU MUST NOT ALTER THOSE VALUES.
