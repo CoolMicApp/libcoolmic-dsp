@@ -1,6 +1,6 @@
 /*
  *      Copyright (C) Jordan Erickson                     - 2014-2016,
- *      Copyright (C) Löwenfelsen UG (haftungsbeschränkt) - 2015-2016
+ *      Copyright (C) LÃ¶wenfelsen UG (haftungsbeschrÃ¤nkt) - 2015-2016
  *       on behalf of Jordan Erickson.
  */
 
