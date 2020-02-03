@@ -265,6 +265,9 @@ static coolmic_simple_segment_t * __segment_get_next(coolmic_simple_t *self)
 
     if (!ret) {
         ret = coolmic_simple_segment_new(NULL, igloo_RO_NULL, COOLMIC_SIMPLE_SP_LIVE, COOLMIC_DSP_SNDDEV_DRIVER_AUTO, NULL, NULL);
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "XXX __segment_get_next: new segment returned ret=%p, self=%p{.segment_list=%p, ...}", ret, self, self->segment_list);
+    } else {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "XXX __segment_get_next: shift returned ret=%p, self=%p{.segment_list=%p, ...}", ret, self, self->segment_list);
     }
 
     return ret;
@@ -281,9 +284,11 @@ static int __segment_connect(coolmic_simple_t *self) {
 
     switch (pipeline) {
         case COOLMIC_SIMPLE_SP_LIVE:
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "XXX __segment_connect: self->current_segment=%p is live", self->current_segment);
             return __segment_connect_live(self);
         break;
         case COOLMIC_SIMPLE_SP_FILE_SIMPLE:
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "XXX __segment_connect: self->current_segment=%p is file simple", self->current_segment);
             return __segment_connect_file(self);
         break;
     }
@@ -791,6 +796,7 @@ int                         coolmic_simple_queue_segment(coolmic_simple_t *self,
 
     pthread_mutex_lock(&(self->lock));
     ret = igloo_list_push(self->segment_list, segment);
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "XXX coolmic_simple_queue_segment(self=%p{.segment_list=%p, ...}, segment=%p)", self, self->segment_list, segment);
     pthread_mutex_unlock(&(self->lock));
 
     if (ret != 0)
