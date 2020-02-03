@@ -29,10 +29,12 @@
 #define __COOLMIC_DSP_SIMPLE_H__
 
 #include <stdint.h>
-#include <igloo/ro.h>
 
+#include <igloo/ro.h>
+#include <igloo/list.h>
 #include "shout.h"
 #include "transform.h"
+#include "simple-segment.h"
 
 /* forward declare internally used structures */
 typedef struct coolmic_simple coolmic_simple_t;
@@ -107,7 +109,19 @@ typedef enum coolmic_simple_event {
      * arg1 is undefined.
      * YOU MUST NOT ALTER THOSE VALUES.
      */
-    COOLMIC_SIMPLE_EVENT_RECONNECT         = 8
+    COOLMIC_SIMPLE_EVENT_RECONNECT         = 8,
+    /* A segment is connected to the stream.
+     * arg0 is a pointer to a coolmic_simple_segment_pipeline_t.
+     * arg1 is undefined.
+     * YOU MUST NOT ALTER THOSE VALUES.
+     */
+    COOLMIC_SIMPLE_EVENT_SEGMENT_CONNECT   = 9,
+    /* A segment is disconnected to the stream.
+     * arg0 is a pointer to a coolmic_simple_segment_pipeline_t.
+     * arg1 is undefined.
+     * YOU MUST NOT ALTER THOSE VALUES.
+     */
+    COOLMIC_SIMPLE_EVENT_SEGMENT_DISCONNECT= 10,
 } coolmic_simple_event_t;
 
 /* Generic callback for events.
@@ -186,6 +200,9 @@ coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self);
 int                 coolmic_simple_set_reconnection_profile(coolmic_simple_t *self, const char *profile);
 int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *self, const char **profile);
 
-int                 coolmic_simple_change_segment(coolmic_simple_t *self, const char *file);
+coolmic_simple_segment_t *  coolmic_simple_get_segment(coolmic_simple_t *self);
+igloo_list_t *              coolmic_simple_get_segment_list(coolmic_simple_t *self);
+int                         coolmic_simple_queue_segment(coolmic_simple_t *self, coolmic_simple_segment_t *segment);
+int                         coolmic_simple_switch_segment(coolmic_simple_t *self);
 
 #endif
