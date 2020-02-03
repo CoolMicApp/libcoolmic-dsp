@@ -109,7 +109,19 @@ typedef enum coolmic_simple_event {
      * arg1 is undefined.
      * YOU MUST NOT ALTER THOSE VALUES.
      */
-    COOLMIC_SIMPLE_EVENT_RECONNECT         = 8
+    COOLMIC_SIMPLE_EVENT_RECONNECT         = 8,
+    /* A segment is connected to the stream.
+     * arg0 is a pointer to a coolmic_simple_segment_pipeline_t.
+     * arg1 is undefined.
+     * YOU MUST NOT ALTER THOSE VALUES.
+     */
+    COOLMIC_SIMPLE_EVENT_SEGMENT_CONNECT   = 9,
+    /* A segment is disconnected to the stream.
+     * arg0 is a pointer to a coolmic_simple_segment_pipeline_t.
+     * arg1 is undefined.
+     * YOU MUST NOT ALTER THOSE VALUES.
+     */
+    COOLMIC_SIMPLE_EVENT_SEGMENT_DISCONNECT= 10,
 } coolmic_simple_event_t;
 
 /* Generic callback for events.

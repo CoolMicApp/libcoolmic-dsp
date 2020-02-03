@@ -146,8 +146,14 @@ static inline void __emit_error_unlocked(coolmic_simple_t *self, void *thread, i
     __emit_event(self, COOLMIC_SIMPLE_EVENT_ERROR, thread, &error, NULL, 0);
 }
 
-static int __segment_disconnect(coolmic_simple_t *self)
-{
+static int __segment_disconnect(coolmic_simple_t *self) {
+    coolmic_simple_segment_pipeline_t pipeline;
+
+    if (coolmic_simple_segment_get_pipeline(self->current_segment, &pipeline) == 0) {
+        __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_SEGMENT_DISCONNECT, &(self->thread),
+                              &pipeline, NULL);
+    }
+
     coolmic_shout_attach_iohandle(self->shout, NULL);
     coolmic_vumeter_attach_iohandle(self->vumeter, NULL);
     coolmic_enc_attach_iohandle(self->enc, NULL);
@@ -281,6 +287,9 @@ static int __segment_connect(coolmic_simple_t *self) {
 
     if (coolmic_simple_segment_get_pipeline(self->current_segment, &pipeline) != 0)
         return -1;
+
+    __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_SEGMENT_CONNECT, &(self->thread),
+                          &pipeline, NULL);
 
     switch (pipeline) {
         case COOLMIC_SIMPLE_SP_LIVE:
