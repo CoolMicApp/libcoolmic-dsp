@@ -573,6 +573,8 @@ static void *__worker(void *userdata)
     while (1) {
         __worker_inner(self);
 
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Inner worker terminated, self->running=%i", (int)self->running);
+
         if (self->running == RUNNING_STOPPED || self->running == RUNNING_STOPPING || !self->reconnection_profile)
             break;
 
@@ -584,6 +586,7 @@ static void *__worker(void *userdata)
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
     self->thread_needs_join = 1;
     pthread_mutex_unlock(&(self->lock));
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Outer worker terminated", (int)self->running);
     return NULL;
 }
 

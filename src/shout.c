@@ -23,11 +23,13 @@
 
 /* Please see the corresponding header file for details of this API. */
 
+#define COOLMIC_COMPONENT "libcoolmic-dsp/shout"
 #include <stdlib.h>
 #include <shout/shout.h>
 #include "types_private.h"
 #include <coolmic-dsp/shout.h>
 #include <coolmic-dsp/coolmic-dsp.h>
+#include <coolmic-dsp/logging.h>
 
 struct coolmic_shout {
     /* base type */
@@ -42,11 +44,14 @@ static void __free(igloo_ro_t self)
 {
     coolmic_shout_t *shout = igloo_RO_TO_TYPE(self, coolmic_shout_t);
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Asked to shut down.");
+
     shout_close(shout->shout);
     shout_free(shout->shout);
     igloo_ro_unref(shout->in);
 
     shout_shutdown();
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "... and down.");
 }
 
 static int __new(igloo_ro_t self, const igloo_ro_type_t *type, va_list ap)
@@ -228,8 +233,10 @@ int              coolmic_shout_iter(coolmic_shout_t *self)
 
     if (self->in) {
         ret = coolmic_iohandle_read(self->in, buffer, sizeof(buffer));
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Got %zi bytes from backend", ret);
         if (ret > 0) {
             shouterror = shout_send(self->shout, (void*)buffer, ret);
+            coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "shout status: %i: %s", shouterror, shout_get_error(self->shout));
             self->need_next_segment = 0;
         } else {
             self->need_next_segment = 1;
