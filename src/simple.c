@@ -598,7 +598,7 @@ static void *__worker(void *userdata)
     }
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
     pthread_mutex_unlock(&(self->lock));
-    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Outer worker terminated", (int)self->running);
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Outer worker terminated");
     return NULL;
 }
 
