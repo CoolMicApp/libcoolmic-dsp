@@ -181,7 +181,7 @@ int                 coolmic_simple_set_meta(coolmic_simple_t *self, const char *
 
 /* Restart the encoder */
 /* This is used to apply quality changes as well as meta data changes.
- * Call this after you fisnihed changeing encoder settings such as quality or meta data.
+ * Call this after you finished changing encoder settings such as quality or meta data.
  * This does not reconnect to the streaming server (e.g. Icecast2) or cause interrupts on the
  * listeners end.
  */
@@ -195,7 +195,7 @@ coolmic_transform_t *coolmic_simple_get_transform(coolmic_simple_t *self);
 
 /* Auto-Reconnect support */
 /* This sets and gets the reconnection profile.
- * The profile returned by the getter is valid only untill altered using the setter or destrction of the object.
+ * The profile returned by the getter is valid only until altered using the setter or destruction of the object.
  */
 int                 coolmic_simple_set_reconnection_profile(coolmic_simple_t *self, const char *profile);
 int                 coolmic_simple_get_reconnection_profile(coolmic_simple_t *self, const char **profile);
