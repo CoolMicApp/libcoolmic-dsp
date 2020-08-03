@@ -131,7 +131,7 @@ typedef enum coolmic_simple_event {
  * * userdata is the userdata pointer as passed on setting the callback function.
  * * event is the event code as defined in coolmic_simple_event_t.
  * * thread is set to a unique pointer to some OS specific structure.
- *   This pointer can be used to identify the thread emiting the event.
+ *   This pointer can be used to identify the thread emitting the event.
  * * arg0's and arg1's usage is up to the specific event.
  *
  * Return value:
