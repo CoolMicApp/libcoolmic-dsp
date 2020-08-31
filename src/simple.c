@@ -319,25 +319,36 @@ static void __stop_locked(coolmic_simple_t *self)
     pthread_join(self->thread, NULL);
     pthread_mutex_lock(&(self->lock));
     self->thread_needs_join = 0;
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stopped worker thread.");
 }
 
 static void __free(igloo_ro_t self)
 {
     coolmic_simple_t *simple = igloo_RO_TO_TYPE(self, coolmic_simple_t);
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Freeing self=%p", simple);
+
     pthread_mutex_lock(&(simple->lock));
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "We are now locked, self=%p", simple);
     __stop_locked(simple);
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stopped the worker, now disconnecting the segment, self=%p", simple);
     __segment_disconnect(simple);
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "self=%p, current_segment=%p", simple, simple->current_segment);
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Starting unref-ing, self=%p", simple);
     igloo_ro_unref(simple->shout);
     igloo_ro_unref(simple->metadata);
 
     igloo_ro_unref(simple->segment_list);
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Starting free-ing, self=%p", simple);
     free(simple->reconnection_profile);
     free(simple->codec);
 
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Unlocking, self=%p", simple);
     pthread_mutex_unlock(&(simple->lock));
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Destroying mutex, self=%p, mutex=%p", simple, &(simple->lock));
     pthread_mutex_destroy(&(simple->lock));
+    coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Done, self=%p", simple);
 }
 
 igloo_RO_PUBLIC_TYPE(coolmic_simple_t,
