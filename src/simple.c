@@ -308,8 +308,10 @@ static int __segment_connect(coolmic_simple_t *self) {
 static void __stop_locked(coolmic_simple_t *self)
 {
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stopping worker thread requested. thread_needs_join=%i, running=%i", (int)self->thread_needs_join, (int)self->running);
-    if (!(self->thread_needs_join || (self->running != RUNNING_STOPPING && self->running != RUNNING_STOPPED)))
+    if (!self->thread_needs_join) {
+        coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Worker thread not running.");
         return;
+    }
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Stopping worker thread.");
     self->running = RUNNING_STOPPING;
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_STOP, NULL, &(self->thread), NULL);
@@ -584,7 +586,6 @@ static void *__worker(void *userdata)
             break;
     }
     __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_PRE_STOP, &(self->thread), NULL, NULL);
-    self->thread_needs_join = 1;
     pthread_mutex_unlock(&(self->lock));
     coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Outer worker terminated", (int)self->running);
     return NULL;
@@ -601,6 +602,7 @@ int                 coolmic_simple_start(coolmic_simple_t *self)
     if (self->running == RUNNING_STOPPED) {
         if (pthread_create(&(self->thread), NULL, __worker, self) == 0) {
             self->running = RUNNING_STARTED;
+            self->thread_needs_join = 1;
             __emit_event_locked(self, COOLMIC_SIMPLE_EVENT_THREAD_START, NULL, &(self->thread), NULL);
         }
     }
