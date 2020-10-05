@@ -54,6 +54,11 @@ typedef struct coolmic_shout_config {
     const char *username;    /* username to login as (default: NULL) */
     const char *password;    /* password to use with username */
     const char *client_cert; /* client cerificate (TLS) (default: NULL=none) */
+
+    /* branding */
+    const char *software_name;
+    const char *software_version;
+    const char *software_comment;
 } coolmic_shout_config_t;
 
 /* configure remote connection */

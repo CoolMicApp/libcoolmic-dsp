@@ -137,6 +137,8 @@ static inline int libshout2error(coolmic_shout_t *self) {
 
 int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_shout_config_t *conf)
 {
+    char ua[256];
+
     if (!self || !conf)
         return COOLMIC_ERROR_FAULT;
 
@@ -177,6 +179,18 @@ int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_s
 
     if (shout_set_password(self->shout, conf->password) != SHOUTERR_SUCCESS)
         return libshout2error(self);
+
+    if (conf->software_name && conf->software_version && conf->software_comment) {
+        snprintf(ua, sizeof(ua), "%s/%s (%s) libcoolmic-dsp libshout/%s", conf->software_name, conf->software_version, conf->software_comment, shout_version(NULL, NULL, NULL));
+    } else if (conf->software_name && conf->software_version) {
+        snprintf(ua, sizeof(ua), "%s/%s libcoolmic-dsp libshout/%s", conf->software_name, conf->software_version, shout_version(NULL, NULL, NULL));
+    } else if (conf->software_name) {
+        snprintf(ua, sizeof(ua), "%s libcoolmic-dsp libshout/%s", conf->software_name, shout_version(NULL, NULL, NULL));
+    } else {
+        snprintf(ua, sizeof(ua), "libcoolmic-dsp libshout/%s", shout_version(NULL, NULL, NULL));
+    }
+
+    shout_set_agent(self->shout, ua);
 
     return COOLMIC_ERROR_NONE;
 }
