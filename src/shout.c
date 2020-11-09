@@ -251,7 +251,7 @@ int              coolmic_shout_iter(coolmic_shout_t *self)
         ret = coolmic_iohandle_read(self->in, buffer, sizeof(buffer));
         coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "Got %zi bytes from backend", ret);
         if (ret > 0) {
-            shouterror = shout_send(self->shout, (void*)buffer, ret);
+            shouterror = shout_send(self->shout, (void*)buffer, (size_t)ret);
             coolmic_logging_log(COOLMIC_LOGGING_LEVEL_DEBUG, COOLMIC_ERROR_NONE, "shout status: %i: %s", shouterror, shout_get_error(self->shout));
             self->need_next_segment = 0;
         } else {
