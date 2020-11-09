@@ -68,6 +68,8 @@ static int __new(igloo_ro_t self, const igloo_ro_type_t *type, va_list ap)
         return -1;
     }
 
+    shout_set_nonblocking(shout->shout, SHOUT_BLOCKING_NONE);
+
     /* set some stuff that is always the same for all connections */
     shout_set_protocol(shout->shout, SHOUT_PROTOCOL_HTTP);
     shout_set_format(shout->shout, SHOUT_FORMAT_OGG);

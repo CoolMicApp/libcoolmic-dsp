@@ -424,7 +424,15 @@ static inline void __worker_inner(coolmic_simple_t *self)
     pthread_mutex_unlock(&(self->lock));
 
     __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTING, COOLMIC_ERROR_NONE);
-    if ((error = coolmic_shout_start(shout)) != COOLMIC_ERROR_NONE) {
+
+    do {
+        error = coolmic_shout_start(shout);
+        pthread_mutex_lock(&(self->lock));
+        running = self->running;
+        pthread_mutex_unlock(&(self->lock));
+    } while ((error == COOLMIC_ERROR_RETRY || error == COOLMIC_ERROR_BUSY) && running == RUNNING_STARTED);
+
+    if (error != COOLMIC_ERROR_NONE) {
         running = RUNNING_STOPPED;
         __emit_error_unlocked(self, &(self->thread), error);
         __emit_cs_unlocked(self, &(self->thread), COOLMIC_SIMPLE_CS_CONNECTIONERROR, error);
