@@ -120,11 +120,13 @@ static int libshouterror2error(const int err) {
             return COOLMIC_ERROR_TLSBADCERT;
         break;
 #endif
-        case SHOUTERR_SOCKET:
-        case SHOUTERR_METADATA:
 #ifdef SHOUTERR_RETRY
         case SHOUTERR_RETRY:
+            return COOLMIC_ERROR_RETRY;
+        break;
 #endif
+        case SHOUTERR_SOCKET:
+        case SHOUTERR_METADATA:
         default:
             return COOLMIC_ERROR_GENERIC;
         break;
