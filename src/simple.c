@@ -31,6 +31,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <errno.h>
+#include <igloo/timing.h>
 #include "types_private.h"
 #include <coolmic-dsp/simple.h>
 #include <coolmic-dsp/iohandle.h>
@@ -430,6 +431,7 @@ static inline void __worker_inner(coolmic_simple_t *self)
         pthread_mutex_lock(&(self->lock));
         running = self->running;
         pthread_mutex_unlock(&(self->lock));
+        igloo_timing_sleep(32);
     } while ((error == COOLMIC_ERROR_RETRY || error == COOLMIC_ERROR_BUSY) && running == RUNNING_STARTED);
 
     if (error != COOLMIC_ERROR_NONE) {
