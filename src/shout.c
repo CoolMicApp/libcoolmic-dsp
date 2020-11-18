@@ -212,11 +212,16 @@ int              coolmic_shout_attach_iohandle(coolmic_shout_t *self, coolmic_io
 
 int              coolmic_shout_start(coolmic_shout_t *self)
 {
+    int ret;
+
     if (!self)
         return COOLMIC_ERROR_FAULT;
 
-    if (shout_get_connected(self->shout) == SHOUTERR_CONNECTED)
+    ret = shout_get_connected(self->shout);
+    if (ret == SHOUTERR_CONNECTED)
         return COOLMIC_ERROR_NONE;
+    if (ret != SHOUTERR_UNCONNECTED)
+        return libshouterror2error(ret);
 
     if (shout_open(self->shout) != SHOUTERR_SUCCESS)
         return libshout2error(self);
