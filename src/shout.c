@@ -72,7 +72,7 @@ static int __new(igloo_ro_t self, const igloo_ro_type_t *type, va_list ap)
 
     /* set some stuff that is always the same for all connections */
     shout_set_protocol(shout->shout, SHOUT_PROTOCOL_HTTP);
-    shout_set_format(shout->shout, SHOUT_FORMAT_OGG);
+    shout_set_content_format(shout->shout, SHOUT_FORMAT_OGG, SHOUT_USAGE_AUDIO, NULL);
 
     return 0;
 }
