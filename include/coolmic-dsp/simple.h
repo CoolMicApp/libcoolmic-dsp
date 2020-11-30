@@ -179,6 +179,12 @@ double              coolmic_simple_get_quality(coolmic_simple_t *self);
  */
 int                 coolmic_simple_set_meta(coolmic_simple_t *self, const char *key, const char *value, int replace);
 
+/* Sets station metadata */
+/* This allows setting station metadata. Station metadata must be set before coolmic_simple_start() is called.
+ * key must be one of SHOUT_META_*.
+ */
+int                 coolmic_simple_set_station_meta(coolmic_simple_t *self, const char *key, const char *value);
+
 /* Restart the encoder */
 /* This is used to apply quality changes as well as meta data changes.
  * Call this after you finished changing encoder settings such as quality or meta data.

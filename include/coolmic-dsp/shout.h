@@ -64,6 +64,11 @@ typedef struct coolmic_shout_config {
 /* configure remote connection */
 int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_shout_config_t *conf);
 
+/* This allows setting station metadata. Station metadata must be set before coolmic_shout_start() is called.
+ * key must be one of SHOUT_META_*.
+ */
+int              coolmic_shout_set_meta(coolmic_shout_t *self, const char *key, const char *value);
+
 /* This is to attach the IO Handle of the Ogg data stream that is to be passed to the Icecast server */
 int              coolmic_shout_attach_iohandle(coolmic_shout_t *self, coolmic_iohandle_t *handle);
 

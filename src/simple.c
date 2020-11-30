@@ -727,6 +727,20 @@ int                 coolmic_simple_set_meta(coolmic_simple_t *self, const char *
     return ret;
 }
 
+int                 coolmic_simple_set_station_meta(coolmic_simple_t *self, const char *key, const char *value)
+{
+    int ret;
+
+    if (!self || !key || !value)
+        return COOLMIC_ERROR_FAULT;
+
+    pthread_mutex_lock(&(self->lock));
+    ret = coolmic_shout_set_meta(self->shout, key, value);
+    pthread_mutex_unlock(&(self->lock));
+
+    return ret;
+}
+
 int                 coolmic_simple_restart_encoder(coolmic_simple_t *self)
 {
     int ret;

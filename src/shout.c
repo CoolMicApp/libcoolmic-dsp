@@ -199,6 +199,17 @@ int              coolmic_shout_set_config(coolmic_shout_t *self, const coolmic_s
     return COOLMIC_ERROR_NONE;
 }
 
+int              coolmic_shout_set_meta(coolmic_shout_t *self, const char *key, const char *value)
+{
+    if (!self || !key || !value)
+        return COOLMIC_ERROR_FAULT;
+
+    if (shout_set_meta(self->shout, key, value) != SHOUTERR_SUCCESS)
+        return libshout2error(self);
+
+    return COOLMIC_ERROR_NONE;
+}
+
 int              coolmic_shout_attach_iohandle(coolmic_shout_t *self, coolmic_iohandle_t *handle)
 {
     if (!self)
