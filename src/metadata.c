@@ -155,7 +155,7 @@ static int __add_tag_value (coolmic_metadata_tag_t *tag, const char *value)
     if (!values_new)
         return COOLMIC_ERROR_NOMEM;
 
-    next = values_new + sizeof(tag->values[0])*tag->values_len;
+    next = &(values_new[tag->values_len]);
     memset(next, 0, sizeof(tag->values[0])*TAG_SLOT_INCREMENT);
     tag->values = values_new;
     tag->values_len += TAG_SLOT_INCREMENT;
@@ -200,7 +200,7 @@ static coolmic_metadata_tag_t * __add_tag(coolmic_metadata_t *self, const char *
     if (!tags_new) /* memory allocation problem */
         return NULL;
 
-    tag = tags_new + sizeof(coolmic_metadata_tag_t)*self->tags_len; /* find first new slot */
+    tag = &(tags_new[self->tags_len]); /* find first new slot */
     memset(tag, 0, sizeof(coolmic_metadata_tag_t)*TAG_SLOT_INCREMENT);
 
     self->tags = tags_new;
