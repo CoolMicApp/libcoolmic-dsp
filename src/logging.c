@@ -57,10 +57,15 @@ const char *coolmic_logging_level2string(coolmic_logging_level_t level)
 
 int coolmic_logging_log_real(const char *file, unsigned long int line, const char *component, coolmic_logging_level_t level, int error, const char *format, ...)
 {
+    const char *n;
     va_list ap;
     char *usermsg;
     char *msg;
     int ret;
+
+    n = strstr(file, "/coolmic/");
+    if (n)
+        file = n + 1;
 
     if (!format)
         return COOLMIC_ERROR_FAULT;
