@@ -124,7 +124,7 @@ struct coolmic_enc {
     coolmic_metadata_t *metadata;
 };
 
-const coolmic_enc_cb_t __coolmic_enc_cb_vorbis;
-const coolmic_enc_cb_t __coolmic_enc_cb_opus;
+extern const coolmic_enc_cb_t __coolmic_enc_cb_vorbis;
+extern const coolmic_enc_cb_t __coolmic_enc_cb_opus;
 
 #endif
