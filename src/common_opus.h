@@ -30,7 +30,7 @@
 
 #ifdef HAVE_ENC_OPUS
 #ifdef HAVE_ENC_OPUS_BROKEN_INCLUDE_PATH
-#include <opus/include/opus.h>
+#include <opus.h>
 #else
 #include <opus/opus.h>
 #endif
