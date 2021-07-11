@@ -40,7 +40,7 @@ typedef enum coolmic_logging_level {
 const char *coolmic_logging_level2string(coolmic_logging_level_t level);
 
 int coolmic_logging_log_real(const char *file, unsigned long int line, const char *component, coolmic_logging_level_t level, int error, const char *format, ...);
-#define coolmic_logging_log(level,error,format,args...) coolmic_logging_log_real(__FILE__, __LINE__, COOLMIC_COMPONENT, (level), (error), (format), ## args)
+#define coolmic_logging_log(level,error,...) coolmic_logging_log_real(__FILE__, __LINE__, COOLMIC_COMPONENT, (level), (error), __VA_ARGS__)
 
 int coolmic_logging_set_cb_simple(int (*cb)(coolmic_logging_level_t level, const char *msg));
 
